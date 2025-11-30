@@ -800,7 +800,8 @@ pos-pwa/
     "zod": "^3.20.2",
     "date-fns": "^2.29.3",
     "react-window": "^1.8.8",
-    "react-hot-toast": "^2.4.0"
+    "react-hot-toast": "^2.4.0",
+    "qz-tray": "^2.0.10"
   },
   "devDependencies": {
     "@types/react": "^18.0.27",
@@ -1216,6 +1217,198 @@ class PWAInstaller {
 
 ### Hardware Integration
 
+#### Receipt Printer Integration with QZ Tray
+```typescript
+class QZTrayPrinterManager {
+  private qzTray: any = null;
+  private isConnected = false;
+  
+  async initializePrinters(): Promise<void> {
+    try {
+      // Load QZ Tray library
+      await this.loadQZTrayLibrary();
+      
+      // Connect to QZ Tray
+      await this.connectToQZTray();
+      
+      // Get available printers
+      const printers = await this.getAvailablePrinters();
+      console.log(`🖨️ Found ${printers.length} printers:`, printers);
+      
+    } catch (error) {
+      console.error('❌ QZ Tray initialization failed:', error);
+      this.isConnected = false;
+    }
+  }
+  
+  private async loadQZTrayLibrary(): Promise<void> {
+    // QZ Tray WebSocket connection
+    const wsUrl = 'ws://localhost:8181';
+    this.qzTray = new WebSocket(wsUrl);
+    
+    return new Promise((resolve, reject) => {
+      this.qzTray.onopen = () => {
+        console.log('✅ Connected to QZ Tray');
+        this.isConnected = true;
+        resolve();
+      };
+      
+      this.qzTray.onerror = (error: any) => {
+        console.error('❌ QZ Tray connection error:', error);
+        reject(error);
+      };
+      
+      this.qzTray.onclose = () => {
+        console.log('🔌 QZ Tray connection closed');
+        this.isConnected = false;
+      };
+    });
+  }
+  
+  async printReceipt(receiptData: ReceiptData): Promise<void> {
+    if (!this.isConnected) {
+      throw new Error('QZ Tray not connected');
+    }
+    
+    try {
+      // Convert receipt data to ESC/POS commands
+      const commands = this.generateESCPosCommands(receiptData);
+      
+      // Find thermal printer
+      const printers = await this.getAvailablePrinters();
+      const thermalPrinter = printers.find(p => 
+        p.name.toLowerCase().includes('thermal') || 
+        p.name.toLowerCase().includes('receipt')
+      ) || printers[0];
+      
+      if (!thermalPrinter) {
+        throw new Error('No thermal printer found');
+      }
+      
+      // Send print job to QZ Tray
+      const printJob = {
+        printer: thermalPrinter.name,
+        commands: commands,
+        options: {
+          copies: 1,
+          margin: 'none'
+        }
+      };
+      
+      await this.sendPrintJob(printJob);
+      
+      console.log(`🧾 Receipt sent to printer: ${thermalPrinter.name}`);
+      
+    } catch (error) {
+      console.error('❌ Receipt printing failed:', error);
+      throw error;
+    }
+  }
+  
+  private generateESCPosCommands(receiptData: ReceiptData): string[] {
+    const commands: string[] = [];
+    
+    // Initialize printer
+    commands.push('\x1B\x40'); // ESC @
+    
+    // Store name (center aligned)
+    commands.push('\x1B\x21\x20'); // Double height
+    commands.push('\x1B\x61\x01'); // Center align
+    commands.push(receiptData.storeName + '\n');
+    
+    // Reset formatting
+    commands.push('\x1B\x21\x00');
+    commands.push('\x1B\x61\x00'); // Left align
+    
+    // Store address
+    commands.push(receiptData.storeAddress + '\n');
+    commands.push('Tel: ' + receiptData.storePhone + '\n');
+    commands.push('\n');
+    
+    // Receipt header
+    commands.push('='.repeat(32) + '\n');
+    commands.push('POS Receipt #' + receiptData.receiptNumber + '\n');
+    commands.push('Cashier: ' + receiptData.cashierName + '\n');
+    commands.push('Date: ' + receiptData.timestamp + '\n');
+    commands.push('='.repeat(32) + '\n\n');
+    
+    // Items
+    receiptData.items.forEach(item => {
+      commands.push(item.quantity + ' x ' + item.name + '\n');
+      commands.push('  @ ' + item.unitPrice.toFixed(2) + '  ');
+      commands.push(this.padLeft(item.totalPrice.toFixed(2), 10) + '\n');
+    });
+    
+    commands.push('-'.repeat(32) + '\n');
+    
+    // Totals
+    commands.push('Subtotal:' + this.padLeft(receiptData.subtotal.toFixed(2), 18) + '\n');
+    commands.push('Tax:' + this.padLeft(receiptData.tax.toFixed(2), 25) + '\n');
+    
+    if (receiptData.discount > 0) {
+      commands.push('Discount:' + this.padLeft('-' + receiptData.discount.toFixed(2), 17) + '\n');
+    }
+    
+    commands.push('='.repeat(32) + '\n');
+    commands.push('\x1B\x21\x20'); // Double height
+    commands.push('TOTAL:' + this.padLeft(receiptData.total.toFixed(2), 17) + '\n');
+    commands.push('\x1B\x21\x00');
+    
+    // Payment info
+    if (receiptData.payment) {
+      commands.push('='.repeat(32) + '\n');
+      commands.push('Payment: ' + receiptData.payment.method + '\n');
+      if (receiptData.payment.change > 0) {
+        commands.push('Change:' + this.padLeft(receiptData.payment.change.toFixed(2), 21) + '\n');
+      }
+    }
+    
+    // Footer
+    commands.push('\n' + '='.repeat(32) + '\n');
+    commands.push('Thank you for your business!\n');
+    commands.push('\n\n\n');
+    
+    // Cut paper
+    commands.push('\x1D\x56\x00'); // GS V 0 (partial cut)
+    
+    return commands;
+  }
+  
+  private padLeft(text: string, length: number): string {
+    return text.padStart(length, ' ');
+  }
+  
+  async getAvailablePrinters(): Promise<PrinterInfo[]> {
+    return new Promise((resolve, reject) => {
+      const message = {
+        method: 'printers',
+        params: {}
+      };
+      
+      const timeout = setTimeout(() => {
+        reject(new Error('QZ Tray request timeout'));
+      }, 5000);
+      
+      this.qzTray.send(JSON.stringify(message));
+      
+      this.qzTray.onmessage = (event: MessageEvent) => {
+        clearTimeout(timeout);
+        try {
+          const response = JSON.parse(event.data);
+          if (response.result) {
+            resolve(response.result);
+          } else {
+            reject(new Error('Invalid QZ Tray response'));
+          }
+        } catch (error) {
+          reject(error);
+        }
+      };
+    });
+  }
+}
+```
+
 #### Barcode Scanner Support
 ```typescript
 class BarcodeScannerManager {
@@ -1254,6 +1447,37 @@ class BarcodeScannerManager {
     this.scanners.push(keyboardScanner);
   }
 }
+```
+
+#### Receipt Printer Integration with QZ Tray
+**Choice: QZ Tray Bridge (Recommended)**
+
+**Rationale:**
+- Cross-browser compatibility (works in all browsers)
+- Direct communication with ESC/POS thermal printers
+- WebSocket-based connection for real-time printing
+- No browser plugin required
+- Excellent error handling and printer detection
+- Active development and strong community support
+
+**QZ Tray Benefits:**
+- Solves browser printing limitations
+- Supports multiple printer brands and models
+- Automatic printer discovery and configuration
+- Print job queuing and retry logic
+- Development and production deployment support
+
+```typescript
+// QZ Tray Configuration
+const QZ_TRAY_CONFIG = {
+  wsUrl: 'ws://localhost:8181',  // QZ Tray WebSocket URL
+  connectionTimeout: 5000,       // Connection timeout in ms
+  printJobTimeout: 30000,        // Print job timeout in ms
+  retryAttempts: 3,              // Number of retry attempts
+  retryDelay: 1000,              // Delay between retries in ms
+  supportedFormats: ['ESC/POS', 'ZPL', 'EPL', 'CPCL'],
+  printerTypes: ['thermal', 'dot-matrix', 'laser']
+};
 ```
 
 ### Monitoring & Maintenance

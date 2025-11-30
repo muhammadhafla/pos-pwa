@@ -6,17 +6,29 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { FixedSizeList as List } from 'react-window';
-import { MagnifyingGlassIcon, FunnelIcon, CameraIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { Item } from '@/types';
+import { MagnifyingGlassIcon, FunnelIcon, CameraIcon, XMarkIcon, TagIcon, BuildingStorefrontIcon, CogIcon } from '@heroicons/react/24/outline';
+import { Item, AdvancedFilters, Category, Supplier, ItemTag, FilterOptions } from '@/types';
 import { db } from '@/services/database/POSDatabase';
+import { categorizationService } from '@/services/database/CategorizationService';
 import { barcodeScanner, ScanResult } from '@/services/barcode/BarcodeScannerManager';
 import { useCartStore } from '@/stores/cartStore';
 import { toast } from 'react-hot-toast';
 
-interface SearchFilters {
-  category?: string;
-  brand?: string;
-  priceRange?: { min: number; max: number };
+interface ItemSearchInterfaceState {
+  searchQuery: string;
+  searchResults: Item[];
+  isSearching: boolean;
+  searchTime: number;
+  showFilters: boolean;
+  filters: AdvancedFilters;
+  selectedItem: Item | null;
+  availableCategories: Category[];
+  availableBrands: string[];
+  availableSuppliers: Supplier[];
+  availableTags: ItemTag[];
+  filterOptions: FilterOptions | null;
+  isScanning: boolean;
+  lastScanResult: ScanResult | null;
 }
 
 interface ItemSearchInterfaceProps {
@@ -36,10 +48,13 @@ const ItemSearchInterface: React.FC<ItemSearchInterfaceProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [searchTime, setSearchTime] = useState<number>(0);
   const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState<SearchFilters>({});
+  const [filters, setFilters] = useState<AdvancedFilters>({});
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
-  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+  const [availableCategories, setAvailableCategories] = useState<Category[]>([]);
   const [availableBrands, setAvailableBrands] = useState<string[]>([]);
+  const [availableSuppliers, setAvailableSuppliers] = useState<Supplier[]>([]);
+  const [availableTags, setAvailableTags] = useState<ItemTag[]>([]);
+  const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [lastScanResult, setLastScanResult] = useState<ScanResult | null>(null);
 
@@ -102,21 +117,20 @@ const ItemSearchInterface: React.FC<ItemSearchInterfaceProps> = ({
   }, [onScanResult]);
 
   /**
-   * Load available categories and brands for filtering
+   * Load available categories, brands, suppliers, and tags for filtering
    */
   const loadAvailableFilters = async () => {
     try {
-      const categories = await db.items
-        .orderBy('category')
-        .uniqueKeys() as string[];
-      
-      const brands = await db.items
-        .where('brand')
-        .notEqual('')
-        .uniqueKeys() as string[];
+      const [categories, filterOptions] = await Promise.all([
+        categorizationService.getCategories(),
+        categorizationService.getFilterOptions()
+      ]);
 
-      setAvailableCategories(categories.filter(Boolean));
-      setAvailableBrands(brands.filter(Boolean));
+      setAvailableCategories(categories);
+      setFilterOptions(filterOptions);
+      setAvailableBrands(filterOptions.brands);
+      setAvailableSuppliers(filterOptions.suppliers);
+      setAvailableTags(filterOptions.tags);
     } catch (error) {
       console.error('Failed to load filter options:', error);
     }
@@ -125,29 +139,13 @@ const ItemSearchInterface: React.FC<ItemSearchInterfaceProps> = ({
   /**
    * Debounced search function with performance monitoring
    */
-  const performSearch = useCallback(async (query: string, currentFilters: SearchFilters) => {
+  const performSearch = useCallback(async (query: string, currentFilters: AdvancedFilters) => {
     const startTime = performance.now();
     setIsSearching(true);
 
     try {
-      // Start with IndexedDB search for fast performance
-      let results = await db.searchItems(query, 50);
-
-      // Apply additional filtering if needed
-      if (currentFilters.category) {
-        results = results.filter(item => item.category === currentFilters.category);
-      }
-
-      if (currentFilters.brand) {
-        results = results.filter(item => item.brand === currentFilters.brand);
-      }
-
-      if (currentFilters.priceRange) {
-        const { min, max } = currentFilters.priceRange;
-        results = results.filter(item => 
-          item.basePrice >= min && item.basePrice <= max
-        );
-      }
+      // Use the categorization service for advanced search
+      const results = await categorizationService.searchItems(query, currentFilters, 50);
 
       const searchDuration = performance.now() - startTime;
       
@@ -404,20 +402,26 @@ const ItemSearchInterface: React.FC<ItemSearchInterfaceProps> = ({
             </button>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Category Filter */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
+                <BuildingStorefrontIcon className="inline h-3 w-3 mr-1" />
                 Category
               </label>
               <select
-                value={filters.category || ''}
-                onChange={(e) => setFilters({ ...filters, category: e.target.value || undefined })}
+                value={filters.categories?.[0] || ''}
+                onChange={(e) => setFilters({ 
+                  ...filters, 
+                  categories: e.target.value ? [e.target.value] : undefined 
+                })}
                 className="w-full text-sm border border-gray-300 rounded px-2 py-1"
               >
                 <option value="">All Categories</option>
                 {availableCategories.map(category => (
-                  <option key={category} value={category}>{category}</option>
+                  <option key={category.id} value={category.id}>
+                    {'--'.repeat(category.level)}{category.name}
+                  </option>
                 ))}
               </select>
             </div>
@@ -428,8 +432,11 @@ const ItemSearchInterface: React.FC<ItemSearchInterfaceProps> = ({
                 Brand
               </label>
               <select
-                value={filters.brand || ''}
-                onChange={(e) => setFilters({ ...filters, brand: e.target.value || undefined })}
+                value={filters.brands?.[0] || ''}
+                onChange={(e) => setFilters({ 
+                  ...filters, 
+                  brands: e.target.value ? [e.target.value] : undefined 
+                })}
                 className="w-full text-sm border border-gray-300 rounded px-2 py-1"
               >
                 <option value="">All Brands</option>
@@ -439,6 +446,56 @@ const ItemSearchInterface: React.FC<ItemSearchInterfaceProps> = ({
               </select>
             </div>
             
+            {/* Supplier Filter */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Supplier
+              </label>
+              <select
+                value={filters.suppliers?.[0] || ''}
+                onChange={(e) => setFilters({ 
+                  ...filters, 
+                  suppliers: e.target.value ? [e.target.value] : undefined 
+                })}
+                className="w-full text-sm border border-gray-300 rounded px-2 py-1"
+              >
+                <option value="">All Suppliers</option>
+                {availableSuppliers.map(supplier => (
+                  <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
+                ))}
+              </select>
+            </div>
+            
+            {/* Tags Filter */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                <TagIcon className="inline h-3 w-3 mr-1" />
+                Tags
+              </label>
+              <select
+                value={filters.tags?.[0] || ''}
+                onChange={(e) => setFilters({ 
+                  ...filters, 
+                  tags: e.target.value ? [e.target.value] : undefined 
+                })}
+                className="w-full text-sm border border-gray-300 rounded px-2 py-1"
+              >
+                <option value="">All Tags</option>
+                {availableTags.map(tag => (
+                  <option key={tag.id} value={tag.id}>
+                    <span 
+                      className="inline-block w-3 h-3 rounded mr-2" 
+                      style={{ backgroundColor: tag.color }}
+                    />
+                    {tag.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          
+          {/* Advanced Filters Row */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 pt-4 border-t border-gray-200">
             {/* Price Range */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -473,7 +530,91 @@ const ItemSearchInterface: React.FC<ItemSearchInterfaceProps> = ({
                 />
               </div>
             </div>
+            
+            {/* Stock Status */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Stock Status
+              </label>
+              <select
+                value={filters.stockStatus || 'all'}
+                onChange={(e) => setFilters({ 
+                  ...filters, 
+                  stockStatus: e.target.value as any 
+                })}
+                className="w-full text-sm border border-gray-300 rounded px-2 py-1"
+              >
+                <option value="all">All Items</option>
+                <option value="in-stock">In Stock</option>
+                <option value="low-stock">Low Stock</option>
+                <option value="out-of-stock">Out of Stock</option>
+              </select>
+            </div>
+            
+            {/* Additional Options */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Options
+              </label>
+              <div className="space-y-1">
+                <label className="flex items-center text-xs">
+                  <input
+                    type="checkbox"
+                    checked={filters.hasBarcode || false}
+                    onChange={(e) => setFilters({ 
+                      ...filters, 
+                      hasBarcode: e.target.checked || undefined 
+                    })}
+                    className="mr-2"
+                  />
+                  Has Barcode
+                </label>
+                <label className="flex items-center text-xs">
+                  <input
+                    type="checkbox"
+                    checked={filters.isActive !== false}
+                    onChange={(e) => setFilters({ 
+                      ...filters, 
+                      isActive: e.target.checked || undefined 
+                    })}
+                    className="mr-2"
+                  />
+                  Active Items Only
+                </label>
+              </div>
+            </div>
           </div>
+          
+          {/* Filter Statistics */}
+          {filterOptions && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-gray-600">
+                <div>
+                  <span className="font-medium">Categories:</span> {filterOptions.categories.length}
+                </div>
+                <div>
+                  <span className="font-medium">Brands:</span> {filterOptions.brands.length}
+                </div>
+                <div>
+                  <span className="font-medium">Suppliers:</span> {filterOptions.suppliers.length}
+                </div>
+                <div>
+                  <span className="font-medium">Tags:</span> {filterOptions.tags.length}
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4 text-xs text-gray-600 mt-2">
+                <div>
+                  <span className="font-medium">In Stock:</span> {filterOptions.stockCounts.inStock}
+                </div>
+                <div>
+                  <span className="font-medium">Low Stock:</span> {filterOptions.stockCounts.lowStock}
+                </div>
+                <div>
+                  <span className="font-medium">Out of Stock:</span> {filterOptions.stockCounts.outOfStock}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

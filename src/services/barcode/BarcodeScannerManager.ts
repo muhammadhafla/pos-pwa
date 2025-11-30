@@ -4,8 +4,8 @@
  * Performance target: <100ms scan time
  */
 
-import { db } from '@/services/database/POSDatabase';
 import { Item } from '@/types';
+import { barcodeLookup, BarcodeLookupService } from '@/services/database/BarcodeLookupService';
 
 export interface ScanResult {
   item?: Item;
@@ -291,11 +291,18 @@ export class BarcodeScannerManager {
   }
 
   /**
-   * Check if barcode format is valid
+   * Check if barcode format is valid using BarcodeLookupService validation
    */
   private isValidBarcode(barcode: string): boolean {
-    // Basic validation rules
-    return barcode.length >= 4 && barcode.length <= 20 && /^[A-Za-z0-9]+$/.test(barcode);
+    // Use the comprehensive validation from BarcodeLookupService
+    const validation = BarcodeLookupService.validateBarcode(barcode);
+    
+    if (!validation.isValid) {
+      console.warn(`❌ Invalid barcode: ${barcode} - ${validation.issues.join(', ')}`);
+      return false;
+    }
+    
+    return true;
   }
 
   /**
@@ -309,7 +316,7 @@ export class BarcodeScannerManager {
   }
 
   /**
-   * Perform actual barcode scan lookup
+   * Perform actual barcode scan lookup with O(1) optimization
    */
   private async performScan(barcode: string): Promise<void> {
     if (this.isScanning) return;
@@ -320,22 +327,30 @@ export class BarcodeScannerManager {
     try {
       console.log(`🔍 Scanning barcode: ${barcode}`);
       
-      // O(1) barcode lookup in IndexedDB
-      const item = await db.getItemByBarcode(barcode);
+      // O(1) optimized barcode lookup with caching
+      const lookupResult = await barcodeLookup.lookupBarcode(barcode);
       
       const scanTime = performance.now() - startTime;
       
       const result: ScanResult = {
-        item,
+        item: lookupResult.item || undefined,
         barcode,
         scanTime,
-        success: !!item,
-        error: item ? undefined : 'Item not found'
+        success: lookupResult.item !== null,
+        error: lookupResult.item ? undefined : 'Item not found'
       };
       
-      // Log performance metrics
+      // Enhanced logging for performance monitoring
+      const source = lookupResult.source === 'cache' ? '⚡ Cache' : 
+                    lookupResult.source === 'database' ? '🗄️ Database' : '❌ Error';
+      console.log(`${source} | Scan: ${barcode} → ${result.success ? 'FOUND' : 'NOT FOUND'} (${scanTime.toFixed(2)}ms)`);
+      
+      // Performance warnings
       if (scanTime > 100) {
-        console.warn(`⚠️ Slow scan detected: ${scanTime.toFixed(2)}ms`);
+        console.warn(`⚠️ Slow scan detected: ${scanTime.toFixed(2)}ms (target: <100ms)`);
+      }
+      if (lookupResult.source === 'error') {
+        console.error(`❌ Barcode lookup error: ${result.error}`);
       }
       
       this.notifyScan(result);
