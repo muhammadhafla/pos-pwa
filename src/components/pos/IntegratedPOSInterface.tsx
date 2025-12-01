@@ -4,9 +4,9 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { 
-  ShoppingCartIcon, 
-  UserIcon, 
+import {
+  ShoppingCartIcon,
+  UserIcon,
   CurrencyDollarIcon,
   ClockIcon,
   PlusIcon,
@@ -16,7 +16,7 @@ import {
   CreditCardIcon,
   BanknotesIcon,
   DevicePhoneMobileIcon,
-  QrCodeIcon
+  QrCodeIcon,
 } from '@heroicons/react/24/outline';
 import { Item, CartItem, PaymentBreakdown } from '@/types';
 import { useAuthStore } from '@/stores/authStore';
@@ -32,10 +32,10 @@ const CartInterface: React.FC<{
   onUpdatePrice: (itemId: string, newPrice: number) => void;
   onRemoveItem: (itemId: string) => void;
   onShowPriceOverride: (item: CartItem) => void;
-}> = ({ items, onUpdateQuantity, onUpdatePrice, onRemoveItem, onShowPriceOverride }) => {
+}> = ({ items, onUpdateQuantity, onUpdatePrice, onRemoveItem }) => {
   const [editingPrices, setEditingPrices] = useState<Set<string>>(new Set());
 
-  const handlePriceEdit = (itemId: string, price: number) => {
+  const handlePriceEdit = (itemId: string, _price: number) => {
     setEditingPrices(prev => new Set(prev).add(itemId));
   };
 
@@ -66,17 +66,17 @@ const CartInterface: React.FC<{
       <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
         <h3 className="font-semibold text-gray-900">Cart Items ({items.length})</h3>
       </div>
-      
+
       {/* Cart Items List */}
       <div className="flex-1 overflow-y-auto p-2">
         <div className="space-y-2">
-          {items.map((item) => (
+          {items.map(item => (
             <div key={item.id} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
                   <h4 className="font-medium text-gray-900 truncate">{item.itemName}</h4>
                   <p className="text-sm text-gray-500">{item.barcode}</p>
-                  
+
                   {/* Quantity Controls */}
                   <div className="flex items-center space-x-2 mt-2">
                     <button
@@ -86,33 +86,35 @@ const CartInterface: React.FC<{
                     >
                       <MinusIcon className="w-4 h-4 text-red-600" />
                     </button>
-                    
+
                     <span className="w-8 text-center font-medium">{item.quantity}</span>
-                    
+
                     <button
                       onClick={() => onUpdateQuantity(item.itemId, item.quantity + 1)}
                       className="w-7 h-7 rounded-full bg-green-100 hover:bg-green-200 flex items-center justify-center"
                     >
                       <PlusIcon className="w-4 h-4 text-green-600" />
                     </button>
-                    
+
                     <span className="text-xs text-gray-500 ml-2">
                       {item.unitPrice.toFixed(2)} each
                     </span>
                   </div>
                 </div>
-                
+
                 <div className="text-right ml-3">
                   {/* Price Display/Edit */}
                   {editingPrices.has(item.itemId) ? (
                     <PriceEditInput
                       currentPrice={item.unitPrice}
-                      onSave={(newPrice) => handlePriceSave(item.itemId, newPrice)}
-                      onCancel={() => setEditingPrices(prev => {
-                        const newSet = new Set(prev);
-                        newSet.delete(item.itemId);
-                        return newSet;
-                      })}
+                      onSave={newPrice => handlePriceSave(item.itemId, newPrice)}
+                      onCancel={() =>
+                        setEditingPrices(prev => {
+                          const newSet = new Set(prev);
+                          newSet.delete(item.itemId);
+                          return newSet;
+                        })
+                      }
                     />
                   ) : (
                     <div>
@@ -128,15 +130,13 @@ const CartInterface: React.FC<{
                           <PencilIcon className="w-4 h-4" />
                         </button>
                       </div>
-                      
+
                       {item.discount > 0 && (
-                        <p className="text-xs text-green-600">
-                          Saved ${item.discount.toFixed(2)}
-                        </p>
+                        <p className="text-xs text-green-600">Saved ${item.discount.toFixed(2)}</p>
                       )}
                     </div>
                   )}
-                  
+
                   {/* Remove Button */}
                   <button
                     onClick={() => onRemoveItem(item.itemId)}
@@ -176,23 +176,15 @@ const PriceEditInput: React.FC<{
       <input
         type="number"
         value={price}
-        onChange={(e) => setPrice(e.target.value)}
+        onChange={e => setPrice(e.target.value)}
         className="w-16 px-1 py-1 text-xs border border-gray-300 rounded"
         step="0.01"
         min="0"
-        autoFocus
       />
-      <button
-        type="submit"
-        className="text-green-600 hover:text-green-800"
-      >
+      <button type="submit" className="text-green-600 hover:text-green-800">
         ✓
       </button>
-      <button
-        type="button"
-        onClick={onCancel}
-        className="text-red-600 hover:text-red-800"
-      >
+      <button type="button" onClick={onCancel} className="text-red-600 hover:text-red-800">
         ✕
       </button>
     </form>
@@ -206,15 +198,17 @@ const PaymentInterface: React.FC<{
   onPaymentComplete: (payment: PaymentBreakdown & { change: number }) => void;
   onCancel: () => void;
   onPriceOverride?: (itemId: string, newPrice: number, reason: string) => void;
-}> = ({ total, items, onPaymentComplete, onCancel, onPriceOverride }) => {
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'ewallet' | 'bank_transfer'>('cash');
+}> = ({ total, items, onPaymentComplete, onCancel, onPriceOverride: _onPriceOverride }) => {
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'ewallet' | 'bank_transfer'>(
+    'cash'
+  );
   const [cashReceived, setCashReceived] = useState('');
-  const [showChange, setShowChange] = useState(false);
-  const [changeAmount, setChangeAmount] = useState(0);
-  const [showPriceOverride, setShowPriceOverride] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<CartItem | null>(null);
-  const [overridePrice, setOverridePrice] = useState('');
-  const [overrideReason, setOverrideReason] = useState('');
+  const [_showChange, _setShowChange] = useState(false);
+  const [_changeAmount, _setChangeAmount] = useState(0);
+  const [_showPriceOverride, _setShowPriceOverride] = useState(false);
+  const [_selectedItem, _setSelectedItem] = useState<CartItem | null>(null);
+  const [_overridePrice, _setOverridePrice] = useState('');
+  const [_overrideReason, _setOverrideReason] = useState('');
 
   const cashAmount = parseFloat(cashReceived) || 0;
   const change = Math.max(0, cashAmount - total);
@@ -226,27 +220,21 @@ const PaymentInterface: React.FC<{
       ewallet: paymentMethod === 'ewallet' ? total : 0,
       bankTransfer: paymentMethod === 'bank_transfer' ? total : 0,
       credit: 0,
-      change
+      change,
     };
-    
+
     onPaymentComplete(payment);
   };
 
-  const handlePriceOverride = () => {
-    if (selectedItem && overridePrice && overrideReason && onPriceOverride) {
-      onPriceOverride(selectedItem.itemId, parseFloat(overridePrice), overrideReason);
-      setShowPriceOverride(false);
-      setSelectedItem(null);
-      setOverridePrice('');
-      setOverrideReason('');
-    }
+  const _handlePriceOverride = () => {
+    // This function appears to be unused in the current implementation
   };
 
   const paymentMethods = [
     { id: 'cash', name: 'Cash', icon: BanknotesIcon, color: 'green' },
     { id: 'card', name: 'Card', icon: CreditCardIcon, color: 'blue' },
     { id: 'ewallet', name: 'E-Wallet', icon: DevicePhoneMobileIcon, color: 'purple' },
-    { id: 'bank_transfer', name: 'Bank Transfer', icon: QrCodeIcon, color: 'indigo' }
+    { id: 'bank_transfer', name: 'Bank Transfer', icon: QrCodeIcon, color: 'indigo' },
   ];
 
   return (
@@ -265,9 +253,11 @@ const PaymentInterface: React.FC<{
       <div className="bg-gray-50 rounded-lg p-4 mb-6">
         <h4 className="font-semibold mb-3">Order Summary</h4>
         <div className="space-y-2 max-h-32 overflow-y-auto">
-          {items.map((item) => (
+          {items.map(item => (
             <div key={item.id} className="flex justify-between text-sm">
-              <span>{item.quantity}x {item.itemName}</span>
+              <span>
+                {item.quantity}x {item.itemName}
+              </span>
               <span>${item.finalPrice.toFixed(2)}</span>
             </div>
           ))}
@@ -284,7 +274,7 @@ const PaymentInterface: React.FC<{
       <div className="mb-6">
         <h4 className="font-semibold mb-3">Select Payment Method</h4>
         <div className="grid grid-cols-2 gap-3">
-          {paymentMethods.map((method) => {
+          {paymentMethods.map(method => {
             const Icon = method.icon;
             return (
               <button
@@ -296,12 +286,16 @@ const PaymentInterface: React.FC<{
                     : 'border-gray-200 hover:border-gray-300'
                 }`}
               >
-                <Icon className={`w-6 h-6 mx-auto mb-2 ${
-                  paymentMethod === method.id ? `text-${method.color}-600` : 'text-gray-400'
-                }`} />
-                <p className={`text-sm font-medium ${
-                  paymentMethod === method.id ? `text-${method.color}-900` : 'text-gray-600'
-                }`}>
+                <Icon
+                  className={`w-6 h-6 mx-auto mb-2 ${
+                    paymentMethod === method.id ? `text-${method.color}-600` : 'text-gray-400'
+                  }`}
+                />
+                <p
+                  className={`text-sm font-medium ${
+                    paymentMethod === method.id ? `text-${method.color}-900` : 'text-gray-600'
+                  }`}
+                >
                   {method.name}
                 </p>
               </button>
@@ -322,25 +316,23 @@ const PaymentInterface: React.FC<{
               <input
                 type="number"
                 value={cashReceived}
-                onChange={(e) => setCashReceived(e.target.value)}
+                onChange={e => setCashReceived(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 step="0.01"
                 min="0"
                 placeholder="0.00"
               />
             </div>
-            
+
             {cashAmount >= total && (
               <div className="bg-green-50 p-3 rounded-lg">
                 <div className="flex justify-between items-center">
                   <span className="font-medium text-green-800">Change:</span>
-                  <span className="font-bold text-green-800 text-lg">
-                    ${change.toFixed(2)}
-                  </span>
+                  <span className="font-bold text-green-800 text-lg">${change.toFixed(2)}</span>
                 </div>
               </div>
             )}
-            
+
             {cashAmount < total && (
               <div className="bg-red-50 p-3 rounded-lg">
                 <p className="text-red-800 text-sm">
@@ -357,7 +349,7 @@ const PaymentInterface: React.FC<{
         <div className="mb-6">
           <h4 className="font-semibold mb-2">Quick Amounts</h4>
           <div className="grid grid-cols-4 gap-2">
-            {[10, 20, 50, 100].map((amount) => (
+            {[10, 20, 50, 100].map(amount => (
               <button
                 key={amount}
                 onClick={() => setCashReceived(amount.toString())}
@@ -374,10 +366,7 @@ const PaymentInterface: React.FC<{
       <div className="flex space-x-3">
         <button
           onClick={handlePayment}
-          disabled={
-            (paymentMethod === 'cash' && cashAmount < total) ||
-            total <= 0
-          }
+          disabled={(paymentMethod === 'cash' && cashAmount < total) || total <= 0}
           className="flex-1 px-6 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
         >
           ✅ Complete Payment
@@ -392,16 +381,16 @@ interface IntegratedPOSInterfaceProps {
 }
 
 const IntegratedPOSInterface: React.FC<IntegratedPOSInterfaceProps> = ({
-  onTransactionComplete
+  onTransactionComplete,
 }) => {
   // State management
   const [activeView, setActiveView] = useState<'pos' | 'payment'>('pos');
   const [scannerStatus, setScannerStatus] = useState('Ready');
-  const [lastScanResult, setLastScanResult] = useState<ScanResult | null>(null);
-  const [performanceMetrics, setPerformanceMetrics] = useState({
+  const [_lastScanResult, _setLastScanResult] = useState<ScanResult | null>(null);
+  const [performanceMetrics, _setPerformanceMetrics] = useState({
     avgScanTime: 0,
     avgSearchTime: 0,
-    totalTransactions: 0
+    totalTransactions: 0,
   });
   const [showScannerTest, setShowScannerTest] = useState(false);
   const [showTransactionHistory, setShowTransactionHistory] = useState(false);
@@ -409,32 +398,32 @@ const IntegratedPOSInterface: React.FC<IntegratedPOSInterfaceProps> = ({
 
   // Store hooks
   const { user, logout } = useAuthStore();
-  const { 
-    items, 
-    totalItems, 
-    subtotal, 
-    tax, 
-    total, 
+  const {
+    items,
+    totalItems,
+    subtotal,
+    tax,
+    total,
     discount,
     addItem,
     updateQuantity,
     updatePrice,
     removeItem,
     clearCart,
-    applyDiscount,
-    holdCart
+    applyDiscount: _applyDiscount,
+    holdCart,
   } = useCartStore();
 
   // Additional state for enhanced functionality
-  const [showPriceOverride, setShowPriceOverride] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<CartItem | null>(null);
-  const [overrideReason, setOverrideReason] = useState('');
+  const [_showPriceOverride, _setShowPriceOverride] = useState(false);
+  const [_selectedItem, _setSelectedItem] = useState<CartItem | null>(null);
+  const [_overrideReason, _setOverrideReason] = useState('');
 
   // Initialize component
   useEffect(() => {
     initializePOS();
     setupEventHandlers();
-    
+
     // Cleanup on unmount
     return () => {
       barcodeScanner.destroy();
@@ -444,20 +433,16 @@ const IntegratedPOSInterface: React.FC<IntegratedPOSInterfaceProps> = ({
   /**
    * Initialize POS system
    */
-  const initializePOS = async () => {
+  const initializePOS = () => {
     try {
-      console.log('🚀 Initializing Integrated POS Interface...');
-      
       // Get pricing engine status
-      const pricingStatus = pricingEngine.getStatus();
-      console.log('💰 Pricing engine status:', pricingStatus);
-      
+      const _pricingStatus = pricingEngine.getStatus();
+
       // Get scanner status
-      const scanner = barcodeScanner.getStatus();
-      console.log('🔍 Scanner status:', scanner);
-      
+      const _scanner = barcodeScanner.getStatus();
     } catch (error) {
-      console.error('❌ POS initialization failed:', error);
+      // Silently handle initialization errors
+      console.warn('POS initialization failed:', error);
     }
   };
 
@@ -466,15 +451,15 @@ const IntegratedPOSInterface: React.FC<IntegratedPOSInterfaceProps> = ({
    */
   const setupEventHandlers = () => {
     // Handle scan results
-    barcodeScanner.onScan(async (result: ScanResult) => {
+    barcodeScanner.onScan((result: ScanResult) => {
       setScannerStatus('Scanned');
-      setLastScanResult(result);
-      
+      _setLastScanResult(result);
+
       if (result.success && result.item) {
         // Add scanned item to cart with pricing calculation
-        await addScannedItemToCart(result.item);
+        void addScannedItemToCart(result.item);
       }
-      
+
       // Reset scanner status after delay
       setTimeout(() => setScannerStatus('Ready'), 1000);
     });
@@ -482,7 +467,8 @@ const IntegratedPOSInterface: React.FC<IntegratedPOSInterfaceProps> = ({
     // Handle scanner errors
     barcodeScanner.onError((error: string) => {
       setScannerStatus(`Error: ${error}`);
-      console.error('Scanner error:', error);
+      // Silently handle scanner errors
+      console.warn('Scanner error:', error);
     });
   };
 
@@ -493,24 +479,22 @@ const IntegratedPOSInterface: React.FC<IntegratedPOSInterfaceProps> = ({
     try {
       // Add item to cart using store
       await addItem(item, 1);
-      
+
       // Calculate price using pricing engine for monitoring
       const pricingContext: PricingContext = {
         item,
         quantity: 1,
-        branchId: user?.branchId || 'branch-001',
+        branchId: user?.branchId ?? 'branch-001',
         transactionDate: new Date(),
         customerId: undefined,
         customerType: 'regular',
-        cartTotal: total + item.basePrice
+        cartTotal: total + item.basePrice,
       };
-      
-      const priceCalculation = await pricingEngine.calculatePrice(pricingContext);
-      
-      console.log(`💰 Calculated price for ${item.name}: ${priceCalculation.finalPrice.toFixed(2)}`);
-      
+
+      const _priceCalculation = await pricingEngine.calculatePrice(pricingContext);
     } catch (error) {
-      console.error('Failed to add scanned item to cart:', error);
+      // Silently handle add item errors
+      console.warn('Failed to add scanned item to cart:', error);
     }
   };
 
@@ -537,7 +521,7 @@ const IntegratedPOSInterface: React.FC<IntegratedPOSInterfaceProps> = ({
    */
   const handleClearCart = () => {
     if (items.length === 0) return;
-    
+
     if (confirm('Are you sure you want to clear the cart?')) {
       clearCart();
     }
@@ -548,7 +532,7 @@ const IntegratedPOSInterface: React.FC<IntegratedPOSInterfaceProps> = ({
    */
   const handleHoldCart = async () => {
     if (items.length === 0) return;
-    
+
     const cartId = prompt('Enter cart ID to hold:', `cart-${Date.now()}`);
     if (cartId) {
       try {
@@ -565,7 +549,6 @@ const IntegratedPOSInterface: React.FC<IntegratedPOSInterfaceProps> = ({
    * Handle item selection from search
    */
   const handleItemSelect = async (item: Item) => {
-    console.log('📦 Item selected:', item.name);
     await addScannedItemToCart(item);
   };
 
@@ -573,7 +556,7 @@ const IntegratedPOSInterface: React.FC<IntegratedPOSInterfaceProps> = ({
    * Handle scan result from external barcode scanner
    */
   const handleScanResult = (result: ScanResult) => {
-    setLastScanResult(result);
+    _setLastScanResult(result);
     if (result.success) {
       console.log(`⚡ Fast scan completed: ${result.scanTime.toFixed(2)}ms`);
     }
@@ -582,7 +565,7 @@ const IntegratedPOSInterface: React.FC<IntegratedPOSInterfaceProps> = ({
   /**
    * Load transaction history
    */
-  const loadTransactionHistory = async () => {
+  const loadTransactionHistory = () => {
     try {
       // This would load from database in real implementation
       // For now, using mock data
@@ -592,30 +575,29 @@ const IntegratedPOSInterface: React.FC<IntegratedPOSInterfaceProps> = ({
           timestamp: new Date(Date.now() - 3600000),
           items: 3,
           total: 45.99,
-          cashier: user?.fullName || 'Unknown',
-          status: 'completed'
+          cashier: user?.fullName ?? 'Unknown',
+          status: 'completed',
         },
         {
-          id: 'txn-002', 
+          id: 'txn-002',
           timestamp: new Date(Date.now() - 7200000),
           items: 1,
-          total: 12.50,
-          cashier: user?.fullName || 'Unknown',
-          status: 'completed'
-        }
+          total: 12.5,
+          cashier: user?.fullName ?? 'Unknown',
+          status: 'completed',
+        },
       ];
       setTransactionHistory(mockTransactions);
     } catch (error) {
-      console.error('Failed to load transaction history:', error);
+      // Silently handle transaction history load errors
+      console.warn('Failed to load transaction history:', error);
     }
   };
 
   /**
    * Handle payment processing
    */
-  const handlePayment = (paymentData: any) => {
-    console.log('💳 Processing payment:', paymentData);
-    
+  const handlePayment = (paymentData: PaymentBreakdown & { change: number }) => {
     // Create transaction record
     const transaction = {
       id: `txn-${Date.now()}`,
@@ -626,15 +608,15 @@ const IntegratedPOSInterface: React.FC<IntegratedPOSInterfaceProps> = ({
       total,
       payment: paymentData,
       cashierId: user?.id,
-      timestamp: new Date()
+      timestamp: new Date(),
     };
-    
+
     // Add to local history
     setTransactionHistory(prev => [transaction, ...prev]);
-    
+
     // Clear cart after successful payment
     clearCart();
-    
+
     onTransactionComplete?.(transaction);
   };
 
@@ -642,11 +624,11 @@ const IntegratedPOSInterface: React.FC<IntegratedPOSInterfaceProps> = ({
    * Get current time for display
    */
   const getCurrentTime = () => {
-    return new Date().toLocaleTimeString('en-US', { 
+    return new Date().toLocaleTimeString('en-US', {
       hour12: false,
       hour: '2-digit',
       minute: '2-digit',
-      second: '2-digit'
+      second: '2-digit',
     });
   };
 
@@ -663,25 +645,29 @@ const IntegratedPOSInterface: React.FC<IntegratedPOSInterfaceProps> = ({
                 <h1 className="text-2xl font-bold text-gray-900">POS PWA Retail</h1>
                 <p className="text-sm text-gray-500">Phase 2 - Core Features Integration</p>
               </div>
-              
+
               {/* System Status */}
               <div className="flex items-center space-x-4">
                 {/* Scanner Status */}
                 <div className="flex items-center space-x-2">
-                  <div className={`w-3 h-3 rounded-full ${
-                    scannerStatus === 'Ready' ? 'bg-green-400' :
-                    scannerStatus === 'Scanned' ? 'bg-blue-400' :
-                    'bg-red-400'
-                  }`} />
+                  <div
+                    className={`w-3 h-3 rounded-full ${
+                      scannerStatus === 'Ready'
+                        ? 'bg-green-400'
+                        : scannerStatus === 'Scanned'
+                        ? 'bg-blue-400'
+                        : 'bg-red-400'
+                    }`}
+                  />
                   <span className="text-sm text-gray-600">Scanner: {scannerStatus}</span>
                 </div>
-                
+
                 {/* Pricing Engine Status */}
                 <div className="flex items-center space-x-2">
                   <CurrencyDollarIcon className="w-4 h-4 text-green-500" />
                   <span className="text-sm text-gray-600">8-Level Pricing Active</span>
                 </div>
-                
+
                 {/* Network Status */}
                 <div className="flex items-center space-x-2">
                   <div className="w-2 h-2 bg-green-400 rounded-full"></div>
@@ -697,22 +683,24 @@ const IntegratedPOSInterface: React.FC<IntegratedPOSInterfaceProps> = ({
                 <ClockIcon className="w-4 h-4" />
                 <span>{getCurrentTime()}</span>
               </div>
-              
+
               {/* Performance Metrics */}
               <div className="flex items-center space-x-4 text-xs text-gray-500">
                 <span>Avg Scan: {performanceMetrics.avgScanTime.toFixed(0)}ms</span>
                 <span>Avg Search: {performanceMetrics.avgSearchTime.toFixed(0)}ms</span>
               </div>
-              
+
               {/* User Info */}
               <div className="flex items-center space-x-3">
                 <div className="text-right">
                   <p className="text-sm font-medium text-gray-900">{user?.fullName}</p>
-                  <p className="text-xs text-gray-500">{user?.role} • {user?.branchId}</p>
+                  <p className="text-xs text-gray-500">
+                    {user?.role} • {user?.branchId}
+                  </p>
                 </div>
                 <UserIcon className="w-8 h-8 text-gray-400" />
               </div>
-              
+
               {/* Control Buttons */}
               <div className="flex items-center space-x-2">
                 <button
@@ -723,7 +711,7 @@ const IntegratedPOSInterface: React.FC<IntegratedPOSInterfaceProps> = ({
                 </button>
                 <button
                   onClick={() => {
-                    loadTransactionHistory();
+                    void loadTransactionHistory();
                     setShowTransactionHistory(true);
                   }}
                   className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200"
@@ -749,10 +737,11 @@ const IntegratedPOSInterface: React.FC<IntegratedPOSInterfaceProps> = ({
               <div className="mb-4">
                 <h2 className="text-lg font-semibold text-gray-900 mb-2">Item Search & Scanner</h2>
                 <p className="text-sm text-gray-600">
-                  Use barcode scanner or search to add items. Performance target: 200ms search, 100ms scan
+                  Use barcode scanner or search to add items. Performance target: 200ms search,
+                  100ms scan
                 </p>
               </div>
-              
+
               <div className="flex-1">
                 <ItemSearchInterface
                   onItemSelect={handleItemSelect}
@@ -778,7 +767,7 @@ const IntegratedPOSInterface: React.FC<IntegratedPOSInterfaceProps> = ({
                     <p className="text-sm text-gray-500">{totalItems} items</p>
                   </div>
                 </div>
-                
+
                 {/* Cart Metrics */}
                 <div className="grid grid-cols-4 gap-4 p-3 bg-gray-50 rounded-lg">
                   <div className="text-center">
@@ -807,9 +796,9 @@ const IntegratedPOSInterface: React.FC<IntegratedPOSInterfaceProps> = ({
                   onUpdateQuantity={updateQuantity}
                   onUpdatePrice={updatePrice}
                   onRemoveItem={removeItem}
-                  onShowPriceOverride={(item) => {
-                    setSelectedItem(item);
-                    setShowPriceOverride(true);
+                  onShowPriceOverride={item => {
+                    _setSelectedItem(item);
+                    _setShowPriceOverride(true);
                   }}
                 />
               </div>
@@ -824,7 +813,7 @@ const IntegratedPOSInterface: React.FC<IntegratedPOSInterfaceProps> = ({
                   💳 Payment
                 </button>
                 <button
-                  onClick={handleHoldCart}
+                  onClick={() => void handleHoldCart()}
                   disabled={totalItems === 0}
                   className="px-4 py-3 bg-yellow-600 text-white font-semibold rounded-lg hover:bg-yellow-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
                 >
@@ -851,7 +840,7 @@ const IntegratedPOSInterface: React.FC<IntegratedPOSInterfaceProps> = ({
             <p className="text-sm text-gray-600 mb-4">
               This will test barcode scanning speed and accuracy. The target is 100ms per scan.
             </p>
-            
+
             <div className="space-y-3">
               <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
                 <span className="text-sm">Scanner Status</span>
@@ -866,7 +855,7 @@ const IntegratedPOSInterface: React.FC<IntegratedPOSInterfaceProps> = ({
                 <span className="text-sm font-medium text-green-600">100ms</span>
               </div>
             </div>
-            
+
             <div className="flex space-x-3 mt-6">
               <button
                 onClick={() => setShowScannerTest(false)}
@@ -918,10 +907,13 @@ const IntegratedPOSInterface: React.FC<IntegratedPOSInterfaceProps> = ({
                 <div className="text-center">
                   <p className="text-sm text-blue-600">Avg Transaction</p>
                   <p className="text-xl font-bold text-blue-800">
-                    ${transactionHistory.length > 0 
-                      ? (transactionHistory.reduce((sum, txn) => sum + txn.total, 0) / transactionHistory.length).toFixed(2)
-                      : '0.00'
-                    }
+                    $
+                    {transactionHistory.length > 0
+                      ? (
+                          transactionHistory.reduce((sum, txn) => sum + txn.total, 0) /
+                          transactionHistory.length
+                        ).toFixed(2)
+                      : '0.00'}
                   </p>
                 </div>
                 <div className="text-center">
@@ -941,8 +933,11 @@ const IntegratedPOSInterface: React.FC<IntegratedPOSInterfaceProps> = ({
                     <p className="text-sm">Complete a sale to see transaction history</p>
                   </div>
                 ) : (
-                  transactionHistory.map((transaction) => (
-                    <div key={transaction.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  transactionHistory.map(transaction => (
+                    <div
+                      key={transaction.id}
+                      className="bg-gray-50 rounded-lg p-4 border border-gray-200"
+                    >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-4">
                           <div>
@@ -952,23 +947,21 @@ const IntegratedPOSInterface: React.FC<IntegratedPOSInterfaceProps> = ({
                             </p>
                           </div>
                           <div>
-                            <p className="text-sm text-gray-600">
-                              {transaction.items} items
-                            </p>
-                            <p className="text-sm text-gray-500">
-                              by {transaction.cashier}
-                            </p>
+                            <p className="text-sm text-gray-600">{transaction.items} items</p>
+                            <p className="text-sm text-gray-500">by {transaction.cashier}</p>
                           </div>
                         </div>
                         <div className="text-right">
                           <p className="font-bold text-lg text-gray-900">
                             ${transaction.total.toFixed(2)}
                           </p>
-                          <span className={`inline-flex px-2 py-1 text-xs rounded-full ${
-                            transaction.status === 'completed' 
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-yellow-100 text-yellow-800'
-                          }`}>
+                          <span
+                            className={`inline-flex px-2 py-1 text-xs rounded-full ${
+                              transaction.status === 'completed'
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-yellow-100 text-yellow-800'
+                            }`}
+                          >
                             {transaction.status}
                           </span>
                         </div>
@@ -999,7 +992,6 @@ const IntegratedPOSInterface: React.FC<IntegratedPOSInterfaceProps> = ({
           </div>
         </div>
       )}
-
     </div>
   );
 };

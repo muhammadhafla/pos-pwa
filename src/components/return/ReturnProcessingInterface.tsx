@@ -9,10 +9,10 @@ import {
   DocumentTextIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
-  XMarkIcon,
-  ClockIcon,
-  UserIcon,
-  CurrencyDollarIcon
+  XMarkIcon as _XMarkIcon,
+  ClockIcon as _ClockIcon,
+  UserIcon as _UserIcon,
+  CurrencyDollarIcon as _CurrencyDollarIcon,
 } from '@heroicons/react/24/outline';
 import { toast } from 'react-hot-toast';
 
@@ -65,7 +65,7 @@ const ReturnProcessingInterface: React.FC = () => {
     { value: 'defective', label: 'Defective' },
     { value: 'changed_mind', label: 'Changed Mind' },
     { value: 'duplicate_purchase', label: 'Duplicate Purchase' },
-    { value: 'other', label: 'Other' }
+    { value: 'other', label: 'Other' },
   ];
 
   // Condition options
@@ -73,7 +73,7 @@ const ReturnProcessingInterface: React.FC = () => {
     { value: 'new', label: 'New/Unused' },
     { value: 'good', label: 'Good Condition' },
     { value: 'damaged', label: 'Damaged' },
-    { value: 'defective', label: 'Defective' }
+    { value: 'defective', label: 'Defective' },
   ];
 
   const handleLookup = async () => {
@@ -88,7 +88,7 @@ const ReturnProcessingInterface: React.FC = () => {
     try {
       // Simulate API call to lookup transaction
       await new Promise(resolve => setTimeout(resolve, 1500));
-      
+
       // Mock transaction data for demo
       const mockTransaction: TransactionLookupResult = {
         id: `tx-${Date.now()}`,
@@ -108,7 +108,7 @@ const ReturnProcessingInterface: React.FC = () => {
             maxReturnable: 150000,
             selectedQuantity: 0,
             returnReason: '',
-            condition: 'new'
+            condition: 'new',
           },
           {
             id: 'item2',
@@ -120,17 +120,16 @@ const ReturnProcessingInterface: React.FC = () => {
             maxReturnable: 100000,
             selectedQuantity: 0,
             returnReason: '',
-            condition: 'new'
-          }
+            condition: 'new',
+          },
         ],
         paymentMethod: 'credit_card',
         daysSincePurchase: 2,
-        isWithinReturnPeriod: true
+        isWithinReturnPeriod: true,
       };
 
       setTransaction(mockTransaction);
       toast.success('Transaction found successfully');
-
     } catch (error) {
       console.error('Transaction lookup failed:', error);
       toast.error('Transaction not found');
@@ -191,7 +190,7 @@ const ReturnProcessingInterface: React.FC = () => {
       errors.push({
         field: 'items',
         message: 'Please select at least one item to return',
-        severity: 'error'
+        severity: 'error',
       });
     }
 
@@ -201,7 +200,7 @@ const ReturnProcessingInterface: React.FC = () => {
         errors.push({
           field: `reason_${item.id}`,
           message: `Return reason required for ${item.name}`,
-          severity: 'error'
+          severity: 'error',
         });
       }
 
@@ -209,7 +208,7 @@ const ReturnProcessingInterface: React.FC = () => {
         errors.push({
           field: `condition_${item.id}`,
           message: `Condition assessment required for ${item.name}`,
-          severity: 'error'
+          severity: 'error',
         });
       }
 
@@ -217,7 +216,7 @@ const ReturnProcessingInterface: React.FC = () => {
         errors.push({
           field: `quantity_${item.id}`,
           message: `Cannot return more than purchased quantity for ${item.name}`,
-          severity: 'error'
+          severity: 'error',
         });
       }
     });
@@ -227,19 +226,20 @@ const ReturnProcessingInterface: React.FC = () => {
       errors.push({
         field: 'return_period',
         message: 'Return period has expired (7 days)',
-        severity: 'error'
+        severity: 'error',
       });
     }
 
     // Check if supervisor approval is needed
     const totalReturnAmount = selectedItems.reduce(
-      (sum, item) => sum + (item.unitPrice * item.selectedQuantity), 
+      (sum, item) => sum + item.unitPrice * item.selectedQuantity,
       0
     );
 
-    const needsApproval = totalReturnAmount > 100000 || 
-                         selectedItems.some(item => item.condition === 'damaged' || item.condition === 'defective') ||
-                         selectedItems.length > 5;
+    const needsApproval =
+      totalReturnAmount > 100000 ||
+      selectedItems.some(item => item.condition === 'damaged' || item.condition === 'defective') ||
+      selectedItems.length > 5;
 
     setRequiresApproval(needsApproval);
 
@@ -250,7 +250,7 @@ const ReturnProcessingInterface: React.FC = () => {
     if (!transaction) return;
 
     const selectedItems = transaction.items.filter(item => item.selectedQuantity > 0);
-    
+
     if (selectedItems.length === 0) {
       toast.error('Please select items to return');
       return;
@@ -274,18 +274,20 @@ const ReturnProcessingInterface: React.FC = () => {
 
     try {
       setIsLoading(true);
-      
+
       // Simulate return processing
       await new Promise(resolve => setTimeout(resolve, 2000));
 
       const selectedItems = transaction.items.filter(item => item.selectedQuantity > 0);
       const refundAmount = selectedItems.reduce(
-        (sum, item) => sum + (item.unitPrice * item.selectedQuantity), 
+        (sum, item) => sum + item.unitPrice * item.selectedQuantity,
         0
       );
 
-      toast.success(`Return processed successfully. Refund: Rp ${refundAmount.toLocaleString('id-ID')}`);
-      
+      toast.success(
+        `Return processed successfully. Refund: Rp ${refundAmount.toLocaleString('id-ID')}`
+      );
+
       // Reset form
       setTransaction(null);
       setLookupValue('');
@@ -293,7 +295,6 @@ const ReturnProcessingInterface: React.FC = () => {
       setRequiresApproval(false);
       setSupervisorPin('');
       setShowApprovalModal(false);
-
     } catch (error) {
       console.error('Return processing failed:', error);
       toast.error('Return processing failed');
@@ -313,10 +314,10 @@ const ReturnProcessingInterface: React.FC = () => {
 
   const getTotalReturnAmount = () => {
     if (!transaction) return 0;
-    
+
     return transaction.items
       .filter(item => item.selectedQuantity > 0)
-      .reduce((sum, item) => sum + (item.unitPrice * item.selectedQuantity), 0);
+      .reduce((sum, item) => sum + item.unitPrice * item.selectedQuantity, 0);
   };
 
   return (
@@ -327,17 +328,15 @@ const ReturnProcessingInterface: React.FC = () => {
           <DocumentTextIcon className="h-6 w-6 text-blue-600 mr-2" />
           <h2 className="text-xl font-bold text-gray-900">Return & Refund Processing</h2>
         </div>
-        
-        <div className="text-sm text-gray-500">
-          7-day return policy
-        </div>
+
+        <div className="text-sm text-gray-500">7-day return policy</div>
       </div>
 
       {/* Transaction Lookup */}
       {!transaction && (
         <div className="mb-6 p-6 border border-gray-200 rounded-lg">
           <h3 className="text-lg font-medium text-gray-900 mb-4">Lookup Transaction</h3>
-          
+
           {/* Lookup Type Selection */}
           <div className="mb-4">
             <div className="flex space-x-4">
@@ -346,7 +345,7 @@ const ReturnProcessingInterface: React.FC = () => {
                   type="radio"
                   value="receipt"
                   checked={lookupType === 'receipt'}
-                  onChange={(e) => setLookupType(e.target.value as any)}
+                  onChange={e => setLookupType(e.target.value as any)}
                   className="mr-2"
                 />
                 Receipt Number
@@ -356,7 +355,7 @@ const ReturnProcessingInterface: React.FC = () => {
                   type="radio"
                   value="barcode"
                   checked={lookupType === 'barcode'}
-                  onChange={(e) => setLookupType(e.target.value as any)}
+                  onChange={e => setLookupType(e.target.value as any)}
                   className="mr-2"
                 />
                 Item Barcode
@@ -366,7 +365,7 @@ const ReturnProcessingInterface: React.FC = () => {
                   type="radio"
                   value="phone"
                   checked={lookupType === 'phone'}
-                  onChange={(e) => setLookupType(e.target.value as any)}
+                  onChange={e => setLookupType(e.target.value as any)}
                   className="mr-2"
                 />
                 Phone Number
@@ -381,14 +380,16 @@ const ReturnProcessingInterface: React.FC = () => {
               <input
                 type="text"
                 value={lookupValue}
-                onChange={(e) => setLookupValue(e.target.value)}
+                onChange={e => setLookupValue(e.target.value)}
                 placeholder={
-                  lookupType === 'receipt' ? 'Enter receipt number' :
-                  lookupType === 'barcode' ? 'Scan or enter barcode' :
-                  'Enter customer phone number'
+                  lookupType === 'receipt'
+                    ? 'Enter receipt number'
+                    : lookupType === 'barcode'
+                    ? 'Scan or enter barcode'
+                    : 'Enter customer phone number'
                 }
                 className="pl-10 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                onKeyPress={(e) => e.key === 'Enter' && handleLookup()}
+                onKeyPress={e => e.key === 'Enter' && handleLookup()}
               />
             </div>
             <button
@@ -415,7 +416,8 @@ const ReturnProcessingInterface: React.FC = () => {
               <div>
                 <div className="text-sm text-gray-600">Purchase Date</div>
                 <div className="font-medium">
-                  {transaction.timestamp.toLocaleDateString('id-ID')} ({transaction.daysSincePurchase} days ago)
+                  {transaction.timestamp.toLocaleDateString('id-ID')} (
+                  {transaction.daysSincePurchase} days ago)
                 </div>
               </div>
               <div>
@@ -424,10 +426,10 @@ const ReturnProcessingInterface: React.FC = () => {
               </div>
               <div>
                 <div className="text-sm text-gray-600">Customer</div>
-                <div className="font-medium">{transaction.customerName || 'Guest'}</div>
+                <div className="font-medium">{transaction.customerName ?? 'Guest'}</div>
               </div>
             </div>
-            
+
             {/* Return Period Status */}
             <div className="mt-4 flex items-center">
               {transaction.isWithinReturnPeriod ? (
@@ -447,7 +449,7 @@ const ReturnProcessingInterface: React.FC = () => {
           {/* Items Selection */}
           <div>
             <h3 className="text-lg font-medium text-gray-900 mb-4">Select Items to Return</h3>
-            
+
             <div className="space-y-4">
               {transaction.items.map(item => (
                 <div key={item.id} className="p-4 border border-gray-200 rounded-lg">
@@ -468,7 +470,7 @@ const ReturnProcessingInterface: React.FC = () => {
                       </label>
                       <select
                         value={item.selectedQuantity}
-                        onChange={(e) => handleItemQuantityChange(item.id, parseInt(e.target.value))}
+                        onChange={e => handleItemQuantityChange(item.id, parseInt(e.target.value))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       >
                         <option value={0}>Don't return</option>
@@ -487,7 +489,7 @@ const ReturnProcessingInterface: React.FC = () => {
                       </label>
                       <select
                         value={item.returnReason}
-                        onChange={(e) => handleItemReasonChange(item.id, e.target.value)}
+                        onChange={e => handleItemReasonChange(item.id, e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       >
                         <option value="">Select reason</option>
@@ -506,7 +508,7 @@ const ReturnProcessingInterface: React.FC = () => {
                       </label>
                       <select
                         value={item.condition}
-                        onChange={(e) => handleItemConditionChange(item.id, e.target.value as any)}
+                        onChange={e => handleItemConditionChange(item.id, e.target.value as any)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       >
                         {conditionOptions.map(option => (
@@ -552,7 +554,7 @@ const ReturnProcessingInterface: React.FC = () => {
                 Rp {getTotalReturnAmount().toLocaleString('id-ID')}
               </div>
             </div>
-            
+
             {requiresApproval && (
               <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
                 <ExclamationTriangleIcon className="h-4 w-4 inline mr-1" />
@@ -569,7 +571,7 @@ const ReturnProcessingInterface: React.FC = () => {
             >
               New Lookup
             </button>
-            
+
             <button
               onClick={processReturn}
               disabled={isLoading || getTotalReturnAmount() === 0 || validationErrors.length > 0}
@@ -586,15 +588,13 @@ const ReturnProcessingInterface: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Supervisor Approval Required</h3>
-            
+
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Supervisor PIN
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Supervisor PIN</label>
               <input
                 type="password"
                 value={supervisorPin}
-                onChange={(e) => setSupervisorPin(e.target.value)}
+                onChange={e => setSupervisorPin(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder="Enter supervisor PIN"
                 maxLength={4}

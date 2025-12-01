@@ -4,14 +4,15 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { 
-  PaymentMethod, 
-  CartItem 
-} from '@/types';
-import { splitPaymentManager, SplitPaymentValidation, PaymentAllocation } from '@/services/payment/SplitPaymentManager';
-import { 
-  CurrencyDollarIcon, 
-  CreditCardIcon, 
+import { PaymentMethod } from '@/types';
+import {
+  splitPaymentManager,
+  SplitPaymentValidation,
+  PaymentAllocation,
+} from '@/services/payment/SplitPaymentManager';
+import {
+  CurrencyDollarIcon,
+  CreditCardIcon,
   QrCodeIcon,
   DevicePhoneMobileIcon,
   BuildingLibraryIcon,
@@ -19,14 +20,14 @@ import {
   CheckCircleIcon,
   ExclamationTriangleIcon,
   XMarkIcon,
-  PlusIcon
+  PlusIcon,
 } from '@heroicons/react/24/outline';
 import { toast } from 'react-hot-toast';
 
 interface SplitPaymentInterfaceProps {
   totalAmount: number;
   transactionId: string;
-  onPaymentComplete: (paymentBreakdown: any) => void;
+  onPaymentComplete: (paymentBreakdown: Record<PaymentMethod, number> & { change?: number }) => void;
   onPaymentCancel: () => void;
   availableMethods?: PaymentMethod[];
   customerPreference?: PaymentMethod;
@@ -46,7 +47,7 @@ const SplitPaymentInterface: React.FC<SplitPaymentInterfaceProps> = ({
   onPaymentComplete,
   onPaymentCancel,
   availableMethods = ['cash', 'card', 'qris', 'ewallet', 'bank_transfer', 'credit'],
-  customerPreference
+  customerPreference,
 }) => {
   const [payments, setPayments] = useState<PaymentMethodState[]>([]);
   const [validation, setValidation] = useState<SplitPaymentValidation | null>(null);
@@ -66,7 +67,7 @@ const SplitPaymentInterface: React.FC<SplitPaymentInterfaceProps> = ({
       method: suggestion.method,
       amount: suggestion.amount,
       processing: false,
-      completed: false
+      completed: false,
     }));
 
     setPayments(initialPayments);
@@ -85,13 +86,13 @@ const SplitPaymentInterface: React.FC<SplitPaymentInterfaceProps> = ({
       .map(p => ({
         method: p.method,
         amount: p.amount,
-        reference: p.reference
+        reference: p.reference,
       }));
 
     const request = {
       transactionId,
       totalAmount,
-      allocations
+      allocations,
     };
 
     const newValidation = splitPaymentManager.validateSplitPayment(request);
@@ -119,7 +120,7 @@ const SplitPaymentInterface: React.FC<SplitPaymentInterfaceProps> = ({
     // Find first available method not already used
     const usedMethods = payments.map(p => p.method);
     const availableMethod = availableMethods.find(method => !usedMethods.includes(method));
-    
+
     if (!availableMethod) {
       toast.error('All payment methods are already in use');
       return;
@@ -129,7 +130,7 @@ const SplitPaymentInterface: React.FC<SplitPaymentInterfaceProps> = ({
       method: availableMethod,
       amount: parseFloat(newMethodAmount),
       processing: false,
-      completed: false
+      completed: false,
     };
 
     setPayments([...payments, newPayment]);
@@ -144,10 +145,8 @@ const SplitPaymentInterface: React.FC<SplitPaymentInterfaceProps> = ({
 
   const processPayment = async (index: number) => {
     const payment = payments[index];
-    
-    setPayments(prev => prev.map((p, i) => 
-      i === index ? { ...p, processing: true } : p
-    ));
+
+    setPayments(prev => prev.map((p, i) => (i === index ? { ...p, processing: true } : p)));
 
     try {
       const result = await splitPaymentManager.processPaymentMethod(
@@ -157,33 +156,37 @@ const SplitPaymentInterface: React.FC<SplitPaymentInterfaceProps> = ({
       );
 
       if (result.success) {
-        setPayments(prev => prev.map((p, i) => 
-          i === index ? { 
-            ...p, 
-            processing: false, 
-            completed: true,
-            reference: result.transactionId || p.reference 
-          } : p
-        ));
-        
+        setPayments(prev =>
+          prev.map((p, i) =>
+            i === index
+              ? {
+                  ...p,
+                  processing: false,
+                  completed: true,
+                  reference: result.transactionId ?? p.reference,
+                }
+              : p
+          )
+        );
+
         toast.success(`${getMethodDisplayName(payment.method)} payment successful`);
       } else {
-        setPayments(prev => prev.map((p, i) => 
-          i === index ? { ...p, processing: false, completed: false } : p
-        ));
-        
+        setPayments(prev =>
+          prev.map((p, i) => (i === index ? { ...p, processing: false, completed: false } : p))
+        );
+
         toast.error(`${payment.method} payment failed: ${result.error}`);
       }
     } catch (error) {
-      setPayments(prev => prev.map((p, i) => 
-        i === index ? { ...p, processing: false, completed: false } : p
-      ));
-      
+      setPayments(prev =>
+        prev.map((p, i) => (i === index ? { ...p, processing: false, completed: false } : p))
+      );
+
       toast.error(`Payment processing failed: ${error}`);
     }
   };
 
-  const completeSplitPayment = async () => {
+  const completeSplitPayment = () => {
     if (!validation?.canProcess) {
       toast.error('Please fix validation errors before proceeding');
       return;
@@ -202,7 +205,7 @@ const SplitPaymentInterface: React.FC<SplitPaymentInterfaceProps> = ({
 
       // Add change calculation
       if (change > 0) {
-        (paymentBreakdown as any).change = change;
+        paymentBreakdown.change = change;
       }
 
       onPaymentComplete(paymentBreakdown);
@@ -227,9 +230,9 @@ const SplitPaymentInterface: React.FC<SplitPaymentInterfaceProps> = ({
       qris: QrCodeIcon,
       ewallet: DevicePhoneMobileIcon,
       bank_transfer: BuildingLibraryIcon,
-      credit: CurrencyDollarIcon
+      credit: CurrencyDollarIcon,
     };
-    
+
     const IconComponent = icons[method] || CreditCardIcon;
     return <IconComponent className="h-5 w-5" />;
   };
@@ -242,9 +245,9 @@ const SplitPaymentInterface: React.FC<SplitPaymentInterfaceProps> = ({
       purple: 'text-purple-600 bg-purple-50 border-purple-200',
       orange: 'text-orange-600 bg-orange-50 border-orange-200',
       indigo: 'text-indigo-600 bg-indigo-50 border-indigo-200',
-      yellow: 'text-yellow-600 bg-yellow-50 border-yellow-200'
+      yellow: 'text-yellow-600 bg-yellow-50 border-yellow-200',
     };
-    
+
     return colors[info.color as keyof typeof colors] || 'text-gray-600 bg-gray-50 border-gray-200';
   };
 
@@ -262,23 +265,33 @@ const SplitPaymentInterface: React.FC<SplitPaymentInterfaceProps> = ({
           </div>
           <div className="text-right">
             <p className="text-sm text-gray-600">Allocated</p>
-            <p className={`text-xl font-semibold ${totalAllocated >= totalAmount ? 'text-green-600' : 'text-orange-600'}`}>
+            <p
+              className={`text-xl font-semibold ${
+                totalAllocated >= totalAmount ? 'text-green-600' : 'text-orange-600'
+              }`}
+            >
               Rp {totalAllocated.toLocaleString('id-ID')}
             </p>
           </div>
         </div>
-        
+
         {remainingAmount > 0 && (
           <div className="mt-2 text-right">
-            <p className="text-sm text-red-600">Remaining: Rp {remainingAmount.toLocaleString('id-ID')}</p>
+            <p className="text-sm text-red-600">
+              Remaining: Rp {remainingAmount.toLocaleString('id-ID')}
+            </p>
           </div>
         )}
-        
+
         {overpayment > 0 && (
           <div className="mt-2 text-right">
-            <p className="text-sm text-blue-600">Overpayment: Rp {overpayment.toLocaleString('id-ID')}</p>
+            <p className="text-sm text-blue-600">
+              Overpayment: Rp {overpayment.toLocaleString('id-ID')}
+            </p>
             {change > 0 && (
-              <p className="text-sm font-medium text-green-600">Change: Rp {change.toLocaleString('id-ID')}</p>
+              <p className="text-sm font-medium text-green-600">
+                Change: Rp {change.toLocaleString('id-ID')}
+              </p>
             )}
           </div>
         )}
@@ -302,7 +315,7 @@ const SplitPaymentInterface: React.FC<SplitPaymentInterfaceProps> = ({
               </div>
             </div>
           )}
-          
+
           {validation.warnings.length > 0 && (
             <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
               <div className="flex items-center">
@@ -324,19 +337,17 @@ const SplitPaymentInterface: React.FC<SplitPaymentInterfaceProps> = ({
       {/* Payment Methods */}
       <div className="space-y-4 mb-6">
         {payments.map((payment, index) => (
-          <div 
-            key={`${payment.method}-${index}`} 
+          <div
+            key={`${payment.method}-${index}`}
             className={`border rounded-lg p-4 ${getMethodColor(payment.method)}`}
           >
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center">
                 {getMethodIcon(payment.method)}
                 <span className="ml-2 font-medium">{getMethodDisplayName(payment.method)}</span>
-                {payment.completed && (
-                  <CheckCircleIcon className="h-5 w-5 text-green-500 ml-2" />
-                )}
+                {payment.completed && <CheckCircleIcon className="h-5 w-5 text-green-500 ml-2" />}
               </div>
-              
+
               {!payment.completed && (
                 <button
                   onClick={() => removePaymentMethod(index)}
@@ -346,19 +357,18 @@ const SplitPaymentInterface: React.FC<SplitPaymentInterfaceProps> = ({
                 </button>
               )}
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {/* Amount Input */}
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Amount
-                </label>
+                <label htmlFor={`amount-${index}`} className="block text-xs font-medium text-gray-700 mb-1">Amount</label>
                 <div className="relative">
                   <CurrencyDollarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <input
+                    id={`amount-${index}`}
                     type="number"
-                    value={payment.amount || ''}
-                    onChange={(e) => handleAmountChange(index, parseFloat(e.target.value) || 0)}
+                    value={payment.amount ?? ''}
+                    onChange={e => handleAmountChange(index, parseFloat(e.target.value) || 0)}
                     disabled={payment.completed}
                     className="pl-10 w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
                     placeholder="0"
@@ -367,24 +377,27 @@ const SplitPaymentInterface: React.FC<SplitPaymentInterfaceProps> = ({
                   />
                 </div>
               </div>
-              
+
               {/* Reference Input (for card, QRIS, etc.) */}
-              {(payment.method === 'card' || payment.method === 'qris' || payment.method === 'ewallet') && (
+              {(payment.method === 'card' ||
+                payment.method === 'qris' ||
+                payment.method === 'ewallet') && (
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                  <label htmlFor={`reference-${index}`} className="block text-xs font-medium text-gray-700 mb-1">
                     Reference {payment.method === 'qris' ? '(QR Code)' : '(Transaction ID)'}
                   </label>
                   <input
+                    id={`reference-${index}`}
                     type="text"
-                    value={payment.reference || ''}
-                    onChange={(e) => handleReferenceChange(index, e.target.value)}
+                    value={payment.reference ?? ''}
+                    onChange={e => handleReferenceChange(index, e.target.value)}
                     disabled={payment.completed}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
                     placeholder={payment.method === 'qris' ? 'Scan QR code' : 'Enter reference'}
                   />
                 </div>
               )}
-              
+
               {/* Process Button */}
               <div className="flex items-end">
                 {payment.completed ? (
@@ -394,7 +407,7 @@ const SplitPaymentInterface: React.FC<SplitPaymentInterfaceProps> = ({
                   </div>
                 ) : (
                   <button
-                    onClick={() => processPayment(index)}
+                    onClick={() => void processPayment(index)}
                     disabled={payment.amount <= 0 || payment.processing}
                     className="w-full px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
                   >
@@ -412,9 +425,7 @@ const SplitPaymentInterface: React.FC<SplitPaymentInterfaceProps> = ({
         <div className="border border-dashed border-gray-300 rounded-lg p-4 mb-6">
           <h4 className="text-sm font-medium text-gray-900 mb-3">Add Payment Method</h4>
           <div className="flex items-center space-x-3">
-            <select
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
+            <select className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
               <option value="">Select payment method</option>
               {availableMethods
                 .filter(method => !payments.some(p => p.method === method))
@@ -427,7 +438,7 @@ const SplitPaymentInterface: React.FC<SplitPaymentInterfaceProps> = ({
             <input
               type="number"
               value={newMethodAmount}
-              onChange={(e) => setNewMethodAmount(e.target.value)}
+              onChange={e => setNewMethodAmount(e.target.value)}
               className="w-32 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="Amount"
               min="0"
@@ -467,9 +478,9 @@ const SplitPaymentInterface: React.FC<SplitPaymentInterfaceProps> = ({
         >
           Cancel
         </button>
-        
+
         <button
-          onClick={completeSplitPayment}
+          onClick={() => void completeSplitPayment()}
           disabled={!validation?.canProcess || isProcessing}
           className="px-8 py-2 bg-green-600 text-white font-medium rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
         >

@@ -6,7 +6,7 @@
 
 import { toast } from 'react-hot-toast';
 import { db } from '@/services/database/POSDatabase';
-import { PaymentBreakdown } from '@/types';
+import { PaymentBreakdown as _PaymentBreakdown } from '@/types';
 
 export interface ReturnItem {
   originalTransactionItemId: string;
@@ -126,10 +126,10 @@ export class ReturnRefundManager {
       const daysSincePurchase = Math.floor(
         (currentDate.getTime() - transactionDate.getTime()) / (1000 * 60 * 60 * 24)
       );
-      
+
       const isWithinReturnPeriod = daysSincePurchase <= this.RETURN_PERIOD_DAYS;
       const totalReturnable = transaction.items.reduce(
-        (sum: number, item: any) => sum + item.totalPrice, 
+        (sum: number, item: any) => sum + item.totalPrice,
         0
       );
 
@@ -137,17 +137,18 @@ export class ReturnRefundManager {
         canReturn: isWithinReturnPeriod && totalReturnable > 0,
         daysSincePurchase,
         isWithinReturnPeriod,
-        totalReturnable
+        totalReturnable,
       };
 
       return {
         transaction,
         items: transaction.items,
         payments: transaction.paymentBreakdown || [],
-        customer: transaction.customerId ? { id: transaction.customerId, name: transaction.customerName } : undefined,
-        validationStatus
+        customer: transaction.customerId
+          ? { id: transaction.customerId, name: transaction.customerName }
+          : undefined,
+        validationStatus,
       };
-
     } catch (error) {
       console.error('Transaction lookup failed:', error);
       throw new Error(`Failed to lookup transaction: ${error}`);
@@ -174,10 +175,11 @@ export class ReturnRefundManager {
       results.push({
         rule: 'return_period',
         passed: daysSincePurchase <= this.RETURN_PERIOD_DAYS,
-        message: daysSincePurchase <= this.RETURN_PERIOD_DAYS 
-          ? `Return within ${this.RETURN_PERIOD_DAYS}-day period` 
-          : `Return period expired (${daysSincePurchase} days ago)`,
-        severity: daysSincePurchase <= this.RETURN_PERIOD_DAYS ? 'info' : 'error'
+        message:
+          daysSincePurchase <= this.RETURN_PERIOD_DAYS
+            ? `Return within ${this.RETURN_PERIOD_DAYS}-day period`
+            : `Return period expired (${daysSincePurchase} days ago)`,
+        severity: daysSincePurchase <= this.RETURN_PERIOD_DAYS ? 'info' : 'error',
       });
 
       // Check if transaction exists and is completed
@@ -186,14 +188,14 @@ export class ReturnRefundManager {
           rule: 'transaction_status',
           passed: false,
           message: 'Original transaction must be completed',
-          severity: 'error'
+          severity: 'error',
         });
       } else {
         results.push({
           rule: 'transaction_status',
           passed: true,
           message: 'Original transaction is valid',
-          severity: 'info'
+          severity: 'info',
         });
       }
 
@@ -208,7 +210,7 @@ export class ReturnRefundManager {
             rule: 'item_exists',
             passed: false,
             message: `Item "${returnItem.name}" not found in original transaction`,
-            severity: 'error'
+            severity: 'error',
           });
         } else {
           // Check quantity
@@ -217,14 +219,14 @@ export class ReturnRefundManager {
               rule: 'quantity_valid',
               passed: false,
               message: `Cannot return ${returnItem.quantityToReturn} of "${returnItem.name}" (only ${originalItem.quantity} purchased)`,
-              severity: 'error'
+              severity: 'error',
             });
           } else {
             results.push({
               rule: 'quantity_valid',
               passed: true,
               message: `Quantity valid for "${returnItem.name}"`,
-              severity: 'info'
+              severity: 'info',
             });
           }
 
@@ -234,14 +236,14 @@ export class ReturnRefundManager {
               rule: 'price_consistency',
               passed: false,
               message: `Price mismatch for "${returnItem.name}" (original: ${originalItem.unitPrice}, return: ${returnItem.unitPrice})`,
-              severity: 'warning'
+              severity: 'warning',
             });
           } else {
             results.push({
               rule: 'price_consistency',
               passed: true,
               message: `Price consistent for "${returnItem.name}"`,
-              severity: 'info'
+              severity: 'info',
             });
           }
         }
@@ -249,7 +251,7 @@ export class ReturnRefundManager {
 
       // Check total return amount
       const totalReturnAmount = returnItems.reduce(
-        (sum, item) => sum + (item.totalPrice * item.quantityToReturn),
+        (sum, item) => sum + item.totalPrice * item.quantityToReturn,
         0
       );
 
@@ -258,14 +260,14 @@ export class ReturnRefundManager {
           rule: 'max_amount',
           passed: false,
           message: `Return amount (${totalReturnAmount}) exceeds maximum allowed (${this.MAX_RETURN_AMOUNT})`,
-          severity: 'error'
+          severity: 'error',
         });
       } else {
         results.push({
           rule: 'max_amount',
           passed: true,
           message: `Return amount within limits`,
-          severity: 'info'
+          severity: 'info',
         });
       }
 
@@ -274,43 +276,54 @@ export class ReturnRefundManager {
       results.push({
         rule: 'supervisor_approval',
         passed: !requiresApproval, // Pass if no approval needed
-        message: requiresApproval 
-          ? 'Supervisor approval required for this return' 
+        message: requiresApproval
+          ? 'Supervisor approval required for this return'
           : 'No supervisor approval required',
-        severity: requiresApproval ? 'warning' : 'info'
+        severity: requiresApproval ? 'warning' : 'info',
       });
 
       // Check return reason validity
-      const validReasons = ['wrong_item', 'damaged', 'defective', 'changed_mind', 'duplicate_purchase', 'other'];
+      const validReasons = [
+        'wrong_item',
+        'damaged',
+        'defective',
+        'changed_mind',
+        'duplicate_purchase',
+        'other',
+      ];
       returnItems.forEach(item => {
         const isValidReason = validReasons.includes(item.returnReason);
         results.push({
           rule: 'return_reason',
           passed: isValidReason,
-          message: isValidReason 
-            ? `Valid return reason for "${item.name}"` 
+          message: isValidReason
+            ? `Valid return reason for "${item.name}"`
             : `Invalid return reason for "${item.name}"`,
-          severity: isValidReason ? 'info' : 'warning'
+          severity: isValidReason ? 'info' : 'warning',
         });
       });
 
       return results;
-
     } catch (error) {
       console.error('Return validation failed:', error);
-      return [{
-        rule: 'validation_error',
-        passed: false,
-        message: `Validation error: ${error}`,
-        severity: 'error'
-      }];
+      return [
+        {
+          rule: 'validation_error',
+          passed: false,
+          message: `Validation error: ${error}`,
+          severity: 'error',
+        },
+      ];
     }
   }
 
   /**
    * Process return request
    */
-  async processReturn(request: RefundRequest, authorization?: RefundAuthorization): Promise<ReturnTransaction> {
+  async processReturn(
+    request: RefundRequest,
+    authorization?: RefundAuthorization
+  ): Promise<ReturnTransaction> {
     try {
       // Generate return transaction ID
       const returnTransactionId = `return-${request.transactionId}-${Date.now()}`;
@@ -338,14 +351,16 @@ export class ReturnRefundManager {
           unitPrice: originalItem.unitPrice,
           totalPrice: originalItem.totalPrice,
           returnReason: item.reason,
-          condition: item.condition
+          condition: item.condition,
         };
       });
 
       // Validate return request
       const validationResults = await this.validateReturnRequest(originalTransaction, returnItems);
-      const hasErrors = validationResults.some(result => !result.passed && result.severity === 'error');
-      
+      const hasErrors = validationResults.some(
+        result => !result.passed && result.severity === 'error'
+      );
+
       if (hasErrors) {
         const errorMessages = validationResults
           .filter(result => !result.passed && result.severity === 'error')
@@ -356,7 +371,7 @@ export class ReturnRefundManager {
 
       // Check if supervisor approval is needed
       const totalReturnAmount = returnItems.reduce(
-        (sum, item) => sum + (item.totalPrice * item.quantityToReturn), 
+        (sum, item) => sum + item.totalPrice * item.quantityToReturn,
         0
       );
       const requiresApproval = this.requiresSupervisorApproval(returnItems, totalReturnAmount);
@@ -371,7 +386,7 @@ export class ReturnRefundManager {
         originalTransactionId: request.transactionId,
         returnTransactionNumber,
         returnDate: new Date(),
-        returnReason: request.notes || 'Customer return',
+        returnReason: request.notes ?? 'Customer return',
         processedBy: 'current-user', // TODO: Get from auth context
         approvedBy: authorization?.authorizedBy,
         status: 'pending',
@@ -381,17 +396,17 @@ export class ReturnRefundManager {
         originalPaymentMethod: 'cash', // TODO: Extract from paymentMethod breakdown
         notes: request.notes,
         requiresApproval,
-        validationResults
+        validationResults,
       };
 
       // Convert to database format and save
       const dbRecord: any = {
         ...returnTransaction,
-        refundMethod: returnTransaction.refundMethod as 'cash' | 'original_payment'
+        refundMethod: returnTransaction.refundMethod as 'cash' | 'original_payment',
       };
-      
+
       await db.saveReturnTransaction(dbRecord);
-      
+
       console.log('Return transaction saved to database:', returnTransaction);
 
       // If supervisor approval is required, mark as pending
@@ -404,7 +419,6 @@ export class ReturnRefundManager {
       }
 
       return returnTransaction;
-
     } catch (error) {
       console.error('Return processing failed:', error);
       throw new Error(`Failed to process return: ${error}`);
@@ -418,10 +432,10 @@ export class ReturnRefundManager {
     try {
       // Update status to approved and processed
       returnTransaction.status = 'processed';
-      
+
       // Process refund
       const refundResult = await this.processRefund(returnTransaction);
-      
+
       if (!refundResult.success) {
         throw new Error(`Refund processing failed: ${refundResult.error}`);
       }
@@ -433,7 +447,6 @@ export class ReturnRefundManager {
       await this.logReturnAuditEvent(returnTransaction, 'return_processed');
 
       toast.success('Return processed successfully');
-
     } catch (error) {
       console.error('Return approval/processing failed:', error);
       returnTransaction.status = 'rejected';
@@ -445,7 +458,9 @@ export class ReturnRefundManager {
   /**
    * Process refund based on method
    */
-  async processRefund(returnTransaction: ReturnTransaction): Promise<{ success: boolean; error?: string }> {
+  async processRefund(
+    returnTransaction: ReturnTransaction
+  ): Promise<{ success: boolean; error?: string }> {
     try {
       // For now, only support cash refunds
       if (returnTransaction.refundMethod === 'cash') {
@@ -456,9 +471,9 @@ export class ReturnRefundManager {
           reason: 'return_refund',
           referenceId: returnTransaction.id,
           userId: returnTransaction.processedBy,
-          notes: `Return transaction ${returnTransaction.returnTransactionNumber}`
+          notes: `Return transaction ${returnTransaction.returnTransactionNumber}`,
         });
-        
+
         return { success: true };
       } else if (returnTransaction.refundMethod === 'original_payment') {
         // TODO: Implement refund to original payment method
@@ -466,7 +481,6 @@ export class ReturnRefundManager {
       }
 
       return { success: false, error: 'Unsupported refund method' };
-
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
@@ -479,8 +493,10 @@ export class ReturnRefundManager {
     const now = new Date();
     const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
     const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, '');
-    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-    
+    const random = Math.floor(Math.random() * 1000)
+      .toString()
+      .padStart(3, '0');
+
     return `RT${dateStr}${timeStr}${random}`;
   }
 
@@ -498,8 +514,8 @@ export class ReturnRefundManager {
       return true;
     }
 
-    const hasConditionIssues = returnItems.some(item => 
-      item.condition === 'damaged' || item.condition === 'defective'
+    const hasConditionIssues = returnItems.some(
+      item => item.condition === 'damaged' || item.condition === 'defective'
     );
 
     if (hasConditionIssues) {
@@ -527,8 +543,8 @@ export class ReturnRefundManager {
    * Log return audit event
    */
   private async logReturnAuditEvent(
-    returnTransaction: ReturnTransaction, 
-    eventType: string, 
+    returnTransaction: ReturnTransaction,
+    eventType: string,
     error?: Error
   ): Promise<void> {
     const auditLog = {
@@ -541,9 +557,9 @@ export class ReturnRefundManager {
         returnAmount: returnTransaction.refundAmount,
         itemCount: returnTransaction.items.length,
         requiresApproval: returnTransaction.requiresApproval,
-        refundMethod: returnTransaction.refundMethod
+        refundMethod: returnTransaction.refundMethod,
       },
-      error: error?.message
+      error: error?.message,
     };
 
     try {
@@ -553,8 +569,6 @@ export class ReturnRefundManager {
       console.error('Failed to log return audit event:', auditError);
     }
   }
-
-
 
   /**
    * Get return transactions for reporting
@@ -569,7 +583,7 @@ export class ReturnRefundManager {
         status: status as any,
         startDate,
         endDate,
-        limit: 100
+        limit: 100,
       });
 
       // Convert database format to return transaction format
@@ -580,7 +594,7 @@ export class ReturnRefundManager {
         totalRefundAmount: dbTx.refundAmount,
         reason: dbTx.returnReason,
         returnReason: dbTx.returnReason,
-        approvedBy: dbTx.approvedBy || '',
+        approvedBy: dbTx.approvedBy ?? '',
         createdAt: dbTx.createdAt,
         status: dbTx.status,
         // Add additional fields as needed
@@ -592,7 +606,7 @@ export class ReturnRefundManager {
         originalPaymentMethod: dbTx.originalPaymentMethod,
         notes: dbTx.notes,
         requiresApproval: dbTx.requiresApproval,
-        validationResults: dbTx.validationResults
+        validationResults: dbTx.validationResults,
       }));
     } catch (error) {
       console.error('Failed to get return transactions:', error);
@@ -604,15 +618,14 @@ export class ReturnRefundManager {
    * Reject return transaction
    */
   async rejectReturn(
-    returnTransactionId: string, 
-    rejectionReason: string, 
+    returnTransactionId: string,
+    rejectionReason: string,
     rejectedBy: string
   ): Promise<void> {
     try {
       // In production, update database
       console.log('Return rejected:', { returnTransactionId, rejectionReason, rejectedBy });
       toast.success('Return rejected');
-
     } catch (error) {
       console.error('Failed to reject return:', error);
       throw error;

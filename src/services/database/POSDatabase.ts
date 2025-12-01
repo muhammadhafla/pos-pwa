@@ -6,7 +6,7 @@ import {
   AuditLog,
   SyncStatus,
   CartItem,
-  PriceOverride,
+  PriceOverride as _PriceOverride,
   User,
   PerformanceMetrics,
   Category,
@@ -15,10 +15,10 @@ import {
   TransactionState,
   SplitPayment,
   ReceiptTemplate,
-  AdvancedFilters
+  AdvancedFilters,
 } from '@/types';
-import { ReturnTransaction } from '@/services/transaction/ReturnRefundManager';
-import { PrintJob } from '@/services/receipt/PrintQueueManager';
+import { ReturnTransaction as _ReturnTransaction } from '@/services/transaction/ReturnRefundManager';
+import { PrintJob as _PrintJob } from '@/services/receipt/PrintQueueManager';
 
 // Cart Hold for suspended transactions
 interface CartHold {
@@ -111,12 +111,12 @@ export class POSDatabase extends Dexie {
   salesQueue!: Table<SalesTransaction>;
   auditLogs!: Table<AuditLog>;
   syncStatus!: Table<SyncStatus>;
-  
+
   // Categorization tables
   categories!: Table<Category>;
   suppliers!: Table<Supplier>;
   itemTags!: Table<ItemTag>;
-  
+
   // Transaction management
   cartHold!: Table<CartHold>;
   priceOverrides!: Table<PriceOverrideRecord>;
@@ -125,7 +125,7 @@ export class POSDatabase extends Dexie {
   transactionStates!: Table<TransactionState>;
   splitPayments!: Table<SplitPayment>;
   receiptTemplates!: Table<ReceiptTemplate>;
-  
+
   // Return & Refund tables
   returnTransactions!: Table<ReturnTransactionRecord>;
   printJobs!: Table<PrintJobRecord>;
@@ -133,7 +133,7 @@ export class POSDatabase extends Dexie {
 
   constructor() {
     super('POSDatabase');
-    
+
     this.version(1).stores({
       // Core operational tables with optimized indexes
       items: `
@@ -151,7 +151,7 @@ export class POSDatabase extends Dexie {
         [category+brand],
         [supplierId+isActive]
       `,
-      
+
       pricingRules: `
         id, 
         priority, 
@@ -163,7 +163,7 @@ export class POSDatabase extends Dexie {
         [ruleType+priority],
         [isActive+priority]
       `,
-      
+
       salesQueue: `
         id, 
         branchId, 
@@ -174,7 +174,7 @@ export class POSDatabase extends Dexie {
         [status+createdAt],
         [branchId+status]
       `,
-      
+
       auditLogs: `
         id, 
         timestamp, 
@@ -184,13 +184,13 @@ export class POSDatabase extends Dexie {
         [timestamp+userId],
         [action+timestamp]
       `,
-      
+
       syncStatus: `
         id, 
         lastSyncTime, 
         isOnline
       `,
-      
+
       // Categorization tables
       categories: `
         id, 
@@ -202,7 +202,7 @@ export class POSDatabase extends Dexie {
         [parentId+displayOrder],
         [level+displayOrder]
       `,
-      
+
       suppliers: `
         id, 
         name, 
@@ -211,7 +211,7 @@ export class POSDatabase extends Dexie {
         [name],
         [code]
       `,
-      
+
       itemTags: `
         id, 
         name, 
@@ -220,14 +220,14 @@ export class POSDatabase extends Dexie {
         [name],
         [category]
       `,
-      
+
       // Supporting tables
       cartHold: `
         id, 
         lastAccessed,
         [lastAccessed]
       `,
-      
+
       priceOverrides: `
         id, 
         itemId, 
@@ -235,20 +235,20 @@ export class POSDatabase extends Dexie {
         timestamp,
         [itemId+timestamp]
       `,
-      
+
       performanceRecords: `
         id, 
         type, 
         timestamp,
         [type+timestamp]
       `,
-      
+
       users: `
         id, 
         lastAccessed,
         [lastAccessed]
       `,
-      
+
       // Transaction management
       transactionStates: `
         id, 
@@ -258,7 +258,7 @@ export class POSDatabase extends Dexie {
         [status+lastUpdated],
         [currentStep+status]
       `,
-      
+
       splitPayments: `
         id, 
         transactionId, 
@@ -267,7 +267,7 @@ export class POSDatabase extends Dexie {
         [transactionId+status],
         [status+createdAt]
       `,
-      
+
       receiptTemplates: `
         id, 
         name, 
@@ -277,7 +277,7 @@ export class POSDatabase extends Dexie {
         [type+isActive],
         [name]
       `,
-      
+
       // Return & Refund tables
       returnTransactions: `
         id, 
@@ -290,7 +290,7 @@ export class POSDatabase extends Dexie {
         [status+returnDate],
         [originalTransactionId+status]
       `,
-      
+
       printJobs: `
         id, 
         transactionId, 
@@ -301,7 +301,7 @@ export class POSDatabase extends Dexie {
         [transactionId+status],
         [priority+createdAt]
       `,
-      
+
       cashLogs: `
         id, 
         type, 
@@ -310,7 +310,7 @@ export class POSDatabase extends Dexie {
         timestamp,
         [type+timestamp],
         [userId+timestamp]
-      `
+      `,
     });
 
     // Hooks for audit logging
@@ -350,12 +350,12 @@ export class POSDatabase extends Dexie {
       resourceId,
       details,
       ipAddress: undefined,
-      deviceId: undefined
+      deviceId: undefined,
     };
 
     await this.auditLogs.add({
       id: crypto.randomUUID(),
-      ...auditLog
+      ...auditLog,
     } as AuditLog);
   }
 
@@ -368,19 +368,13 @@ export class POSDatabase extends Dexie {
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
     // Clean up old performance records (30 days)
-    await this.performanceRecords
-      .where('timestamp')
-      .below(thirtyDaysAgo)
-      .delete();
+    await this.performanceRecords.where('timestamp').below(thirtyDaysAgo).delete();
 
     // Clean up old held carts (7 days)
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    await this.cartHold
-      .where('lastAccessed')
-      .below(sevenDaysAgo)
-      .delete();
+    await this.cartHold.where('lastAccessed').below(sevenDaysAgo).delete();
 
     // Clean up old audit logs (1 year, but keep critical ones)
     await this.auditLogs
@@ -392,41 +386,35 @@ export class POSDatabase extends Dexie {
 
   async getItemByBarcode(barcode: string): Promise<Item | undefined> {
     const startTime = performance.now();
-    
+
     // First try primary barcode index
     let item = await this.items.where('barcode').equals(barcode).first();
-    
+
     // If not found, check additional barcodes
     if (!item) {
-      item = await this.items
-        .where('additionalBarcodes')
-        .anyOf([barcode])
-        .first();
+      item = await this.items.where('additionalBarcodes').anyOf([barcode]).first();
     }
 
     const duration = performance.now() - startTime;
     await this.recordPerformance('scan', duration, { barcode });
-    
+
     return item;
   }
 
   async searchItems(query: string, limit = 50): Promise<Item[]> {
     const startTime = performance.now();
-    
+
     // Use name index for search
-    let items = await this.items
-      .where('name')
-      .startsWithIgnoreCase(query)
-      .limit(limit)
-      .toArray();
+    let items = await this.items.where('name').startsWithIgnoreCase(query).limit(limit).toArray();
 
     // If no results, try partial match
     if (items.length === 0) {
       items = await this.items
-        .filter(item =>
-          (item.name?.toLowerCase().includes(query.toLowerCase()) ?? false) ||
-          item.barcode.includes(query) ||
-          (item.brand?.toLowerCase().includes(query.toLowerCase()) ?? false)
+        .filter(
+          item =>
+            (item.name?.toLowerCase().includes(query.toLowerCase()) ?? false) ||
+            item.barcode.includes(query) ||
+            (item.brand?.toLowerCase().includes(query.toLowerCase()) ?? false)
         )
         .limit(limit)
         .toArray();
@@ -434,7 +422,7 @@ export class POSDatabase extends Dexie {
 
     const duration = performance.now() - startTime;
     await this.recordPerformance('search', duration, { query, resultCount: items.length });
-    
+
     return items;
   }
 
@@ -448,7 +436,7 @@ export class POSDatabase extends Dexie {
       type,
       duration,
       timestamp: new Date(),
-      metadata
+      metadata,
     });
   }
 
@@ -456,47 +444,40 @@ export class POSDatabase extends Dexie {
     const since = new Date();
     since.setDate(since.getDate() - days);
 
-    const records = await this.performanceRecords
-      .where('timestamp')
-      .above(since)
-      .toArray();
+    const records = await this.performanceRecords.where('timestamp').above(since).toArray();
 
-    const scanTimes = records
-      .filter(r => r.type === 'scan')
-      .map(r => r.duration);
-    
-    const searchTimes = records
-      .filter(r => r.type === 'search')
-      .map(r => r.duration);
+    const scanTimes = records.filter(r => r.type === 'scan').map(r => r.duration);
+
+    const searchTimes = records.filter(r => r.type === 'search').map(r => r.duration);
 
     return {
       scanTimes,
       searchTimes,
-      lastUpdate: new Date()
+      lastUpdate: new Date(),
     };
   }
 
   async addToCartHold(cartId: string, items: CartItem[], totalAmount: number): Promise<void> {
     const existing = await this.cartHold.get(cartId);
-    
+
     await this.cartHold.put({
       id: cartId,
       items,
       totalAmount,
-      createdAt: existing?.createdAt || new Date(),
-      lastAccessed: new Date()
+      createdAt: existing?.createdAt ?? new Date(),
+      lastAccessed: new Date(),
     });
   }
 
   async getCartHold(cartId: string): Promise<CartHold | undefined> {
     const cart = await this.cartHold.get(cartId);
-    
+
     if (cart) {
       // Update last accessed time
       cart.lastAccessed = new Date();
       await this.cartHold.put(cart);
     }
-    
+
     return cart;
   }
 
@@ -510,7 +491,7 @@ export class POSDatabase extends Dexie {
 
   async getActivePricingRules(): Promise<PricingRule[]> {
     const now = new Date();
-    
+
     return await this.pricingRules
       .where('isActive')
       .equals(1) // Dexie uses 1 for true in boolean indexes
@@ -523,32 +504,22 @@ export class POSDatabase extends Dexie {
     return await this.syncStatus.get(branchId);
   }
 
-  async updateSyncStatus(
-    branchId: string,
-    status: Partial<Omit<SyncStatus, 'id'>>
-  ): Promise<void> {
+  async updateSyncStatus(branchId: string, status: Partial<Omit<SyncStatus, 'id'>>): Promise<void> {
     await this.syncStatus.put({
       id: branchId,
       lastSyncTime: new Date(),
       pendingTransactions: 0,
       pendingItems: 0,
       isOnline: navigator.onLine,
-      ...status
+      ...status,
     });
   }
 
   async getRecentAuditLogs(limit = 100): Promise<AuditLog[]> {
-    return await this.auditLogs
-      .orderBy('timestamp')
-      .reverse()
-      .limit(limit)
-      .toArray();
+    return await this.auditLogs.orderBy('timestamp').reverse().limit(limit).toArray();
   }
 
-  async logSecurityIncident(
-    action: string,
-    details: Record<string, any>
-  ): Promise<void> {
+  async logSecurityIncident(action: string, details: Record<string, any>): Promise<void> {
     await this.auditLogs.add({
       id: crypto.randomUUID(),
       timestamp: new Date(),
@@ -560,22 +531,19 @@ export class POSDatabase extends Dexie {
       details: {
         ...details,
         severity: 'HIGH',
-        requiresInvestigation: true
-      }
+        requiresInvestigation: true,
+      },
     });
   }
 
   // Categorization System Methods
-  
+
   /**
    * Get hierarchical category tree
    */
   async getCategoryTree(): Promise<Category[]> {
-    const categories = await this.categories
-      .where('isActive')
-      .equals(1)
-      .sortBy('displayOrder');
-    
+    const categories = await this.categories.where('isActive').equals(1).sortBy('displayOrder');
+
     return this.buildCategoryTree(categories);
   }
 
@@ -596,7 +564,7 @@ export class POSDatabase extends Dexie {
       if (category.parentId) {
         const parent = categoryMap.get(category.parentId);
         if (parent) {
-          parent.children = parent.children || [];
+          parent.children = parent.children ?? [];
           parent.children.push(categoryMap.get(category.id)!);
         }
       } else {
@@ -610,11 +578,7 @@ export class POSDatabase extends Dexie {
   /**
    * Search items with advanced filters
    */
-  async searchItemsAdvanced(
-    query: string, 
-    filters: AdvancedFilters, 
-    limit = 50
-  ): Promise<Item[]> {
+  async searchItemsAdvanced(query: string, filters: AdvancedFilters, limit = 50): Promise<Item[]> {
     const startTime = performance.now();
 
     try {
@@ -623,45 +587,37 @@ export class POSDatabase extends Dexie {
 
       // Apply category filters
       if (filters.categories && filters.categories.length > 0) {
-        results = results.filter(item => 
-          filters.categories!.includes(item.category)
-        );
+        results = results.filter(item => filters.categories!.includes(item.category));
       }
 
       // Apply brand filters
       if (filters.brands && filters.brands.length > 0) {
-        results = results.filter(item => 
-          item.brand && filters.brands!.includes(item.brand)
-        );
+        results = results.filter(item => item.brand && filters.brands!.includes(item.brand));
       }
 
       // Apply supplier filters
       if (filters.suppliers && filters.suppliers.length > 0) {
-        results = results.filter(item => 
-          item.supplierId && filters.suppliers!.includes(item.supplierId)
+        results = results.filter(
+          item => item.supplierId && filters.suppliers!.includes(item.supplierId)
         );
       }
 
       // Apply tag filters
       if (filters.tags && filters.tags.length > 0) {
-        results = results.filter(item => 
-          filters.tags!.some(tagId => item.tags.includes(tagId))
-        );
+        results = results.filter(item => filters.tags!.some(tagId => item.tags.includes(tagId)));
       }
 
       // Apply price range filter
       if (filters.priceRange) {
         const { min, max } = filters.priceRange;
-        results = results.filter(item => 
-          item.basePrice >= min && item.basePrice <= max
-        );
+        results = results.filter(item => item.basePrice >= min && item.basePrice <= max);
       }
 
       // Apply stock status filter
       if (filters.stockStatus && filters.stockStatus !== 'all') {
         results = results.filter(item => {
           if (!item.stock) return filters.stockStatus === 'in-stock';
-          
+
           const { current, minimum } = item.stock;
           switch (filters.stockStatus) {
             case 'in-stock':
@@ -683,16 +639,14 @@ export class POSDatabase extends Dexie {
 
       // Apply barcode requirement
       if (filters.hasBarcode !== undefined) {
-        results = results.filter(item => 
-          filters.hasBarcode ? !!item.barcode : true
-        );
+        results = results.filter(item => (filters.hasBarcode ? !!item.barcode : true));
       }
 
       const searchDuration = performance.now() - startTime;
-      await this.recordPerformance('search', searchDuration, { 
-        query, 
+      await this.recordPerformance('search', searchDuration, {
+        query,
         resultCount: results.length,
-        filterCount: Object.keys(filters).length
+        filterCount: Object.keys(filters).length,
       });
 
       return results.slice(0, limit);
@@ -719,32 +673,35 @@ export class POSDatabase extends Dexie {
         this.items.where('brand').notEqual('').uniqueKeys(),
         this.suppliers.where('isActive').equals(1).toArray(),
         this.itemTags.orderBy('name').toArray(),
-        this.items.where('isActive').equals(1).toArray()
+        this.items.where('isActive').equals(1).toArray(),
       ]);
 
       // Calculate price range
       const prices = items.map(item => item.basePrice);
       const priceRange = {
         min: Math.min(...prices, 0),
-        max: Math.max(...prices, 0)
+        max: Math.max(...prices, 0),
       };
 
       // Calculate stock counts
-      const stockCounts = items.reduce((acc, item) => {
-        if (!item.stock) {
-          acc.inStock++;
-        } else {
-          const { current, minimum } = item.stock;
-          if (current === 0) {
-            acc.outOfStock++;
-          } else if (current <= minimum) {
-            acc.lowStock++;
-          } else {
+      const stockCounts = items.reduce(
+        (acc, item) => {
+          if (!item.stock) {
             acc.inStock++;
+          } else {
+            const { current, minimum } = item.stock;
+            if (current === 0) {
+              acc.outOfStock++;
+            } else if (current <= minimum) {
+              acc.lowStock++;
+            } else {
+              acc.inStock++;
+            }
           }
-        }
-        return acc;
-      }, { inStock: 0, lowStock: 0, outOfStock: 0 });
+          return acc;
+        },
+        { inStock: 0, lowStock: 0, outOfStock: 0 }
+      );
 
       return {
         categories,
@@ -752,7 +709,7 @@ export class POSDatabase extends Dexie {
         suppliers,
         tags,
         priceRange,
-        stockCounts
+        stockCounts,
       };
     } catch (error) {
       console.error('Failed to get filter options:', error);
@@ -768,7 +725,7 @@ export class POSDatabase extends Dexie {
     const transactionState: TransactionState = {
       id,
       ...state,
-      lastUpdated: new Date()
+      lastUpdated: new Date(),
     };
 
     await this.transactionStates.add(transactionState);
@@ -779,13 +736,10 @@ export class POSDatabase extends Dexie {
     return await this.transactionStates.get(id);
   }
 
-  async updateTransactionState(
-    id: string, 
-    updates: Partial<TransactionState>
-  ): Promise<void> {
+  async updateTransactionState(id: string, updates: Partial<TransactionState>): Promise<void> {
     await this.transactionStates.update(id, {
       ...updates,
-      lastUpdated: new Date()
+      lastUpdated: new Date(),
     });
   }
 
@@ -797,7 +751,7 @@ export class POSDatabase extends Dexie {
     const splitPayment: SplitPayment = {
       id,
       ...payment,
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
 
     await this.splitPayments.add(splitPayment);
@@ -805,37 +759,30 @@ export class POSDatabase extends Dexie {
   }
 
   async getSplitPayment(transactionId: string): Promise<SplitPayment | undefined> {
-    return await this.splitPayments
-      .where('transactionId')
-      .equals(transactionId)
-      .first();
+    return await this.splitPayments.where('transactionId').equals(transactionId).first();
   }
 
-  async updateSplitPayment(
-    id: string, 
-    updates: Partial<SplitPayment>
-  ): Promise<void> {
+  async updateSplitPayment(id: string, updates: Partial<SplitPayment>): Promise<void> {
     await this.splitPayments.update(id, {
       ...updates,
-      updatedAt: new Date()
+      updatedAt: new Date(),
     });
   }
 
   /**
    * Receipt Template Management
    */
-  async getActiveReceiptTemplate(type: ReceiptTemplate['type']): Promise<ReceiptTemplate | undefined> {
-    return await this.receiptTemplates
-      .where('[type+isActive]')
-      .equals([type, 1])
-      .first();
+  async getActiveReceiptTemplate(
+    type: ReceiptTemplate['type']
+  ): Promise<ReceiptTemplate | undefined> {
+    return await this.receiptTemplates.where('[type+isActive]').equals([type, 1]).first();
   }
 
   async createReceiptTemplate(template: Omit<ReceiptTemplate, 'id'>): Promise<string> {
     const id = crypto.randomUUID();
     const receiptTemplate: ReceiptTemplate = {
       id,
-      ...template
+      ...template,
     };
 
     await this.receiptTemplates.add(receiptTemplate);
@@ -854,7 +801,7 @@ export class POSDatabase extends Dexie {
     const record: ReturnTransactionRecord = {
       ...returnTransaction,
       createdAt: returnTransaction.createdAt || now,
-      updatedAt: now
+      updatedAt: now,
     };
 
     await this.returnTransactions.put(record);
@@ -871,7 +818,9 @@ export class POSDatabase extends Dexie {
   /**
    * Get return transaction by original transaction ID
    */
-  async getReturnTransactionByOriginal(originalTransactionId: string): Promise<ReturnTransactionRecord[]> {
+  async getReturnTransactionByOriginal(
+    originalTransactionId: string
+  ): Promise<ReturnTransactionRecord[]> {
     return await this.returnTransactions
       .where('originalTransactionId')
       .equals(originalTransactionId)
@@ -909,20 +858,20 @@ export class POSDatabase extends Dexie {
       filteredRecords = filteredRecords.filter(record => record.returnDate <= filters.endDate!);
     }
 
-    return filteredRecords.slice(0, filters.limit || 100);
+    return filteredRecords.slice(0, filters.limit ?? 100);
   }
 
   /**
    * Update return transaction status
    */
   async updateReturnTransactionStatus(
-    id: string, 
+    id: string,
     status: ReturnTransactionRecord['status'],
     approvedBy?: string
   ): Promise<void> {
     const updates: Partial<ReturnTransactionRecord> = {
       status,
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
 
     if (approvedBy) {
@@ -950,13 +899,15 @@ export class POSDatabase extends Dexie {
   /**
    * Create print job
    */
-  async createPrintJob(printJob: Omit<PrintJobRecord, 'id' | 'createdAt' | 'attempts'>): Promise<string> {
+  async createPrintJob(
+    printJob: Omit<PrintJobRecord, 'id' | 'createdAt' | 'attempts'>
+  ): Promise<string> {
     const id = crypto.randomUUID();
     const job: PrintJobRecord = {
       id,
       ...printJob,
       createdAt: new Date(),
-      attempts: 0
+      attempts: 0,
     };
 
     await this.printJobs.add(job);
@@ -967,10 +918,7 @@ export class POSDatabase extends Dexie {
    * Get pending print jobs by priority
    */
   async getPendingPrintJobs(): Promise<PrintJobRecord[]> {
-    return await this.printJobs
-      .where('status')
-      .anyOf(['pending', 'retry'])
-      .sortBy('priority');
+    return await this.printJobs.where('status').anyOf(['pending', 'retry']).sortBy('priority');
   }
 
   /**
@@ -983,7 +931,7 @@ export class POSDatabase extends Dexie {
   ): Promise<void> {
     const updates: Partial<PrintJobRecord> = {
       status,
-      lastAttemptAt: new Date()
+      lastAttemptAt: new Date(),
     };
 
     if (errorMessage) {
@@ -1007,7 +955,7 @@ export class POSDatabase extends Dexie {
     const newAttempts = job.attempts + 1;
     await this.printJobs.update(id, {
       attempts: newAttempts,
-      lastAttemptAt: new Date()
+      lastAttemptAt: new Date(),
     });
 
     return newAttempts;
@@ -1017,10 +965,7 @@ export class POSDatabase extends Dexie {
    * Get print jobs for transaction
    */
   async getPrintJobsForTransaction(transactionId: string): Promise<PrintJobRecord[]> {
-    return await this.printJobs
-      .where('transactionId')
-      .equals(transactionId)
-      .toArray();
+    return await this.printJobs.where('transactionId').equals(transactionId).toArray();
   }
 
   /**
@@ -1035,7 +980,7 @@ export class POSDatabase extends Dexie {
     const record: CashLogRecord = {
       id,
       ...log,
-      timestamp: new Date()
+      timestamp: new Date(),
     };
 
     await this.cashLogs.add(record);
@@ -1072,13 +1017,16 @@ export class POSDatabase extends Dexie {
       filteredLogs = filteredLogs.filter(log => log.timestamp <= filters.endDate!);
     }
 
-    return filteredLogs.slice(0, filters.limit || 100);
+    return filteredLogs.slice(0, filters.limit ?? 100);
   }
 
   /**
    * Get cash disbursement summary for date range
    */
-  async getCashDisbursementSummary(startDate: Date, endDate: Date): Promise<{
+  async getCashDisbursementSummary(
+    startDate: Date,
+    endDate: Date
+  ): Promise<{
     totalDisbursed: number;
     returnRefunds: number;
     totalTransactions: number;
@@ -1087,19 +1035,19 @@ export class POSDatabase extends Dexie {
     const logs = await this.getCashLogs({
       type: 'cash_disbursement',
       startDate,
-      endDate
+      endDate,
     });
 
     const summary = {
       totalDisbursed: 0,
       returnRefunds: 0,
       totalTransactions: logs.length,
-      byUser: {} as Record<string, number>
+      byUser: {} as Record<string, number>,
     };
 
     logs.forEach(log => {
       summary.totalDisbursed += log.amount;
-      
+
       if (log.reason === 'return_refund') {
         summary.returnRefunds += log.amount;
       }
@@ -1117,19 +1065,15 @@ export class POSDatabase extends Dexie {
   /**
    * Get transaction by receipt number
    */
-  async getTransactionByReceiptNumber(receiptNumber: string): Promise<SalesTransaction | undefined> {
+  async getTransactionByReceiptNumber(
+    receiptNumber: string
+  ): Promise<SalesTransaction | undefined> {
     // Try to find in sales queue
-    let transaction = await this.salesQueue
-      .where('receiptNumber')
-      .equals(receiptNumber)
-      .first();
+    let transaction = await this.salesQueue.where('receiptNumber').equals(receiptNumber).first();
 
     // If not found, try to find by transaction ID (receiptNumber field)
     if (!transaction) {
-      transaction = await this.salesQueue
-        .where('id')
-        .equals(receiptNumber)
-        .first();
+      transaction = await this.salesQueue.where('id').equals(receiptNumber).first();
     }
 
     return transaction;
@@ -1138,11 +1082,11 @@ export class POSDatabase extends Dexie {
   /**
    * Get transactions by customer phone
    */
-  async getTransactionsByCustomerPhone(phoneNumber: string): Promise<SalesTransaction[]> {
+  getTransactionsByCustomerPhone(phoneNumber: string): Promise<SalesTransaction[]> {
     // Since we don't have a customer phone field in the schema,
     // we'll need to store this metadata or find alternative approach
     // For now, return empty array
-    return [];
+    return Promise.resolve([]);
   }
 
   /**
@@ -1165,12 +1109,9 @@ export class POSDatabase extends Dexie {
    */
   async findTransactionsByBarcode(barcode: string): Promise<SalesTransaction[]> {
     const recentTransactions = await this.getRecentTransactions(30);
-    
-    return recentTransactions.filter(transaction => 
-      transaction.items.some(item => 
-        item.barcode === barcode || 
-        item.id === barcode
-      )
+
+    return recentTransactions.filter(transaction =>
+      transaction.items.some(item => item.barcode === barcode || item.id === barcode)
     );
   }
 }

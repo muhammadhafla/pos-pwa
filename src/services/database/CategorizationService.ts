@@ -4,17 +4,9 @@
  */
 
 import { db } from './POSDatabase';
-import { 
-  Category, 
-  Supplier, 
-  ItemTag, 
-  Item, 
-  AdvancedFilters, 
-  FilterOptions 
-} from '@/types';
+import { Category, Supplier, ItemTag, Item, AdvancedFilters, FilterOptions } from '@/types';
 
 export class CategorizationService {
-  
   /**
    * Get all categories with hierarchical structure
    */
@@ -30,14 +22,16 @@ export class CategorizationService {
   /**
    * Create a new category
    */
-  async createCategory(category: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+  async createCategory(
+    category: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>
+  ): Promise<string> {
     try {
       const now = new Date();
       const newCategory: Category = {
         id: crypto.randomUUID(),
         ...category,
         createdAt: now,
-        updatedAt: now
+        updatedAt: now,
       };
 
       await db.categories.add(newCategory);
@@ -60,7 +54,7 @@ export class CategorizationService {
 
       await db.categories.update(id, {
         ...updates,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       });
     } catch (error) {
       console.error('Failed to update category:', error);
@@ -87,7 +81,7 @@ export class CategorizationService {
 
       await db.categories.update(id, {
         isActive: false,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       });
     } catch (error) {
       console.error('Failed to delete category:', error);
@@ -100,10 +94,7 @@ export class CategorizationService {
    */
   async getSuppliers(): Promise<Supplier[]> {
     try {
-      return await db.suppliers
-        .where('isActive')
-        .equals(1)
-        .sortBy('name');
+      return await db.suppliers.where('isActive').equals(1).sortBy('name');
     } catch (error) {
       console.error('Failed to get suppliers:', error);
       throw error;
@@ -113,14 +104,16 @@ export class CategorizationService {
   /**
    * Create a new supplier
    */
-  async createSupplier(supplier: Omit<Supplier, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+  async createSupplier(
+    supplier: Omit<Supplier, 'id' | 'createdAt' | 'updatedAt'>
+  ): Promise<string> {
     try {
       const now = new Date();
       const newSupplier: Supplier = {
         id: crypto.randomUUID(),
         ...supplier,
         createdAt: now,
-        updatedAt: now
+        updatedAt: now,
       };
 
       await db.suppliers.add(newSupplier);
@@ -153,7 +146,7 @@ export class CategorizationService {
         id: crypto.randomUUID(),
         ...tag,
         createdAt: now,
-        updatedAt: now
+        updatedAt: now,
       };
 
       await db.itemTags.add(newTag);
@@ -167,11 +160,7 @@ export class CategorizationService {
   /**
    * Search items with advanced filtering
    */
-  async searchItems(
-    query: string, 
-    filters: AdvancedFilters, 
-    limit = 50
-  ): Promise<Item[]> {
+  async searchItems(query: string, filters: AdvancedFilters, limit = 50): Promise<Item[]> {
     try {
       return await db.searchItemsAdvanced(query, filters, limit);
     } catch (error) {
@@ -248,7 +237,7 @@ export class CategorizationService {
         .toArray();
 
       const subcategoryIds: string[] = [];
-      
+
       for (const child of children) {
         subcategoryIds.push(child.id);
         const grandchildren = await this.getSubcategoryIds(child.id);
@@ -265,11 +254,13 @@ export class CategorizationService {
   /**
    * Get brand statistics
    */
-  async getBrandStatistics(): Promise<Array<{
-    brand: string;
-    itemCount: number;
-    averagePrice: number;
-  }>> {
+  async getBrandStatistics(): Promise<
+    Array<{
+      brand: string;
+      itemCount: number;
+      averagePrice: number;
+    }>
+  > {
     try {
       const items = await db.items
         .where('isActive')
@@ -284,7 +275,7 @@ export class CategorizationService {
           acc[item.brand] = {
             brand: item.brand,
             itemCount: 0,
-            totalPrice: 0
+            totalPrice: 0,
           };
         }
 
@@ -297,7 +288,7 @@ export class CategorizationService {
       return Object.values(brandStats).map(stat => ({
         brand: stat.brand,
         itemCount: stat.itemCount,
-        averagePrice: stat.totalPrice / stat.itemCount
+        averagePrice: stat.totalPrice / stat.itemCount,
       }));
     } catch (error) {
       console.error('Failed to get brand statistics:', error);
@@ -308,12 +299,14 @@ export class CategorizationService {
   /**
    * Get supplier statistics
    */
-  async getSupplierStatistics(): Promise<Array<{
-    supplier: Supplier;
-    itemCount: number;
-    averagePrice: number;
-    totalValue: number;
-  }>> {
+  async getSupplierStatistics(): Promise<
+    Array<{
+      supplier: Supplier;
+      itemCount: number;
+      averagePrice: number;
+      totalValue: number;
+    }>
+  > {
     try {
       const [suppliers, items] = await Promise.all([
         this.getSuppliers(),
@@ -321,7 +314,7 @@ export class CategorizationService {
           .where('isActive')
           .equals(1)
           .and(item => !!item.supplierId)
-          .toArray()
+          .toArray(),
       ]);
 
       return suppliers.map(supplier => {
@@ -332,7 +325,7 @@ export class CategorizationService {
           supplier,
           itemCount: supplierItems.length,
           averagePrice: supplierItems.length > 0 ? totalValue / supplierItems.length : 0,
-          totalValue
+          totalValue,
         };
       });
     } catch (error) {
@@ -353,7 +346,7 @@ export class CategorizationService {
           { name: 'Food & Beverage', level: 0, displayOrder: 1, isActive: true },
           { name: 'Personal Care', level: 0, displayOrder: 2, isActive: true },
           { name: 'Household', level: 0, displayOrder: 3, isActive: true },
-          { name: 'Electronics', level: 0, displayOrder: 4, isActive: true }
+          { name: 'Electronics', level: 0, displayOrder: 4, isActive: true },
         ];
 
         for (const categoryData of defaultCategories) {
@@ -369,7 +362,7 @@ export class CategorizationService {
           { name: 'New Arrival', color: '#3B82F6', category: 'Status' },
           { name: 'Sale', color: '#EF4444', category: 'Pricing' },
           { name: 'Organic', color: '#059669', category: 'Quality' },
-          { name: 'Local', color: '#F59E0B', category: 'Origin' }
+          { name: 'Local', color: '#F59E0B', category: 'Origin' },
         ];
 
         for (const tagData of defaultTags) {

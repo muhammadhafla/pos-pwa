@@ -4,13 +4,11 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { 
-  TransactionState, 
-  TransactionStep, 
-  CartItem, 
-  PaymentBreakdown
-} from '@/types';
-import { transactionStateManager, TransactionValidationResult } from '@/services/transaction/TransactionStateManager';
+import { TransactionState, TransactionStep, CartItem, PaymentBreakdown } from '@/types';
+import {
+  transactionStateManager,
+  TransactionValidationResult,
+} from '@/services/transaction/TransactionStateManager';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from 'react-hot-toast';
 
@@ -23,7 +21,7 @@ interface UseTransactionStateReturn {
   payment: PaymentBreakdown | null;
   isLoading: boolean;
   validation: TransactionValidationResult | null;
-  
+
   // Actions
   startTransaction: () => Promise<string>;
   addItems: (items: CartItem[]) => Promise<void>;
@@ -37,7 +35,7 @@ interface UseTransactionStateReturn {
   suspendTransaction: () => Promise<void>;
   resumeTransaction: (transactionId: string) => Promise<void>;
   cancelTransaction: (reason: string) => Promise<void>;
-  
+
   // Utilities
   canProceedToNext: boolean;
   canGoBack: boolean;
@@ -55,21 +53,21 @@ export const useTransactionState = (): UseTransactionStateReturn => {
   const [payment, setPayment] = useState<PaymentBreakdown | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [validation, setValidation] = useState<TransactionValidationResult | null>(null);
-  
+
   // Auth store for user context
   const { user } = useAuthStore();
-  
+
   // Refs for cleanup
-  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const autoSaveTimeoutRef = useRef<number | null>(null);
+  const validationTimeoutRef = useRef<number | null>(null);
 
   // Auto-save functionality
   const autoSave = useCallback(() => {
     if (autoSaveTimeoutRef.current) {
       clearTimeout(autoSaveTimeoutRef.current);
     }
-    
-    autoSaveTimeoutRef.current = setTimeout(async () => {
+
+    autoSaveTimeoutRef.current = window.setTimeout(async () => {
       if (transactionId && items.length > 0) {
         try {
           await transactionStateManager.addItemsToTransaction(transactionId, items);
@@ -86,8 +84,8 @@ export const useTransactionState = (): UseTransactionStateReturn => {
     if (validationTimeoutRef.current) {
       clearTimeout(validationTimeoutRef.current);
     }
-    
-    validationTimeoutRef.current = setTimeout(async () => {
+
+    validationTimeoutRef.current = window.setTimeout(async () => {
       if (transactionId) {
         try {
           const result = await transactionStateManager.validateTransaction(transactionId);
@@ -105,12 +103,12 @@ export const useTransactionState = (): UseTransactionStateReturn => {
     try {
       const state = await transactionStateManager.getTransaction(id);
       const context = transactionStateManager.getTransactionContext(id);
-      
+
       if (state && context) {
         setTransactionState(state);
         setTransactionId(id);
         setItems(context.data.items || []);
-        setPayment(context.data.payment || null);
+        setPayment(context.data.payment ?? null);
       } else {
         toast.error('Transaction not found');
       }
@@ -133,15 +131,15 @@ export const useTransactionState = (): UseTransactionStateReturn => {
       const id = await transactionStateManager.startTransaction(
         user.id,
         user.branchId,
-        'device-' + Date.now() // Simple device ID for now
+        `device-${Date.now()}` // Simple device ID for now
       );
-      
+
       setTransactionId(id);
       setTransactionState(await transactionStateManager.getTransaction(id));
       setItems([]);
       setPayment(null);
       setValidation(null);
-      
+
       toast.success('New transaction started');
       return id;
     } catch (error) {
@@ -154,104 +152,117 @@ export const useTransactionState = (): UseTransactionStateReturn => {
   }, [user]);
 
   // Add items to transaction
-  const addItems = useCallback(async (newItems: CartItem[]) => {
-    if (!transactionId) return;
+  const addItems = useCallback(
+    async (newItems: CartItem[]) => {
+      if (!transactionId) return;
 
-    setIsLoading(true);
-    try {
-      await transactionStateManager.addItemsToTransaction(transactionId, newItems);
-      setItems(prev => {
-        const updated = [...prev];
-        newItems.forEach(newItem => {
-          const existingIndex = updated.findIndex(item => item.itemId === newItem.itemId);
-          if (existingIndex >= 0) {
-            updated[existingIndex].quantity += newItem.quantity;
-            updated[existingIndex].totalPrice = updated[existingIndex].quantity * updated[existingIndex].unitPrice;
-          } else {
-            updated.push(newItem);
-          }
+      setIsLoading(true);
+      try {
+        await transactionStateManager.addItemsToTransaction(transactionId, newItems);
+        setItems(prev => {
+          const updated = [...prev];
+          newItems.forEach(newItem => {
+            const existingIndex = updated.findIndex(item => item.itemId === newItem.itemId);
+            if (existingIndex >= 0) {
+              updated[existingIndex].quantity += newItem.quantity;
+              updated[existingIndex].totalPrice =
+                updated[existingIndex].quantity * updated[existingIndex].unitPrice;
+            } else {
+              updated.push(newItem);
+            }
+          });
+          return updated;
         });
-        return updated;
-      });
-      
-      autoSave();
-      autoValidate();
-    } catch (error) {
-      console.error('Failed to add items:', error);
-      toast.error('Failed to add items');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [transactionId, autoSave, autoValidate]);
+
+        autoSave();
+        autoValidate();
+      } catch (error) {
+        console.error('Failed to add items:', error);
+        toast.error('Failed to add items');
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [transactionId, autoSave, autoValidate]
+  );
 
   // Remove item from transaction
-  const removeItem = useCallback(async (itemId: string) => {
-    if (!transactionId) return;
+  const removeItem = useCallback(
+    async (itemId: string) => {
+      if (!transactionId) return;
 
-    setIsLoading(true);
-    try {
-      await transactionStateManager.removeItemFromTransaction(transactionId, itemId);
-      setItems(prev => prev.filter(item => item.itemId !== itemId));
-      
-      autoSave();
-      autoValidate();
-    } catch (error) {
-      console.error('Failed to remove item:', error);
-      toast.error('Failed to remove item');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [transactionId, autoSave, autoValidate]);
+      setIsLoading(true);
+      try {
+        await transactionStateManager.removeItemFromTransaction(transactionId, itemId);
+        setItems(prev => prev.filter(item => item.itemId !== itemId));
+
+        autoSave();
+        autoValidate();
+      } catch (error) {
+        console.error('Failed to remove item:', error);
+        toast.error('Failed to remove item');
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [transactionId, autoSave, autoValidate]
+  );
 
   // Update item quantity
-  const updateItemQuantity = useCallback(async (itemId: string, quantity: number) => {
-    if (!transactionId) return;
+  const updateItemQuantity = useCallback(
+    async (itemId: string, quantity: number) => {
+      if (!transactionId) return;
 
-    setIsLoading(true);
-    try {
-      await transactionStateManager.updateItemQuantity(transactionId, itemId, quantity);
-      setItems(prev => {
-        const updated = [...prev];
-        const itemIndex = updated.findIndex(item => item.itemId === itemId);
-        if (itemIndex >= 0) {
-          if (quantity <= 0) {
-            updated.splice(itemIndex, 1);
-          } else {
-            updated[itemIndex].quantity = quantity;
-            updated[itemIndex].totalPrice = quantity * updated[itemIndex].unitPrice;
+      setIsLoading(true);
+      try {
+        await transactionStateManager.updateItemQuantity(transactionId, itemId, quantity);
+        setItems(prev => {
+          const updated = [...prev];
+          const itemIndex = updated.findIndex(item => item.itemId === itemId);
+          if (itemIndex >= 0) {
+            if (quantity <= 0) {
+              updated.splice(itemIndex, 1);
+            } else {
+              updated[itemIndex].quantity = quantity;
+              updated[itemIndex].totalPrice = quantity * updated[itemIndex].unitPrice;
+            }
           }
-        }
-        return updated;
-      });
-      
-      autoSave();
-      autoValidate();
-    } catch (error) {
-      console.error('Failed to update item quantity:', error);
-      toast.error('Failed to update item quantity');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [transactionId, autoSave, autoValidate]);
+          return updated;
+        });
+
+        autoSave();
+        autoValidate();
+      } catch (error) {
+        console.error('Failed to update item quantity:', error);
+        toast.error('Failed to update item quantity');
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [transactionId, autoSave, autoValidate]
+  );
 
   // Set payment information
-  const setPaymentInfo = useCallback(async (newPayment: PaymentBreakdown) => {
-    if (!transactionId) return;
+  const setPaymentInfo = useCallback(
+    async (newPayment: PaymentBreakdown) => {
+      if (!transactionId) return;
 
-    setIsLoading(true);
-    try {
-      await transactionStateManager.setPayment(transactionId, newPayment);
-      setPayment(newPayment);
-      
-      autoSave();
-      autoValidate();
-    } catch (error) {
-      console.error('Failed to set payment:', error);
-      toast.error('Failed to set payment');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [transactionId, autoSave, autoValidate]);
+      setIsLoading(true);
+      try {
+        await transactionStateManager.setPayment(transactionId, newPayment);
+        setPayment(newPayment);
+
+        autoSave();
+        autoValidate();
+      } catch (error) {
+        console.error('Failed to set payment:', error);
+        toast.error('Failed to set payment');
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [transactionId, autoSave, autoValidate]
+  );
 
   // Move to next step
   const nextStep = useCallback(async () => {
@@ -259,16 +270,22 @@ export const useTransactionState = (): UseTransactionStateReturn => {
 
     setIsLoading(true);
     try {
-      const stepOrder: TransactionStep[] = ['items', 'pricing', 'payment', 'confirmation', 'printing'];
+      const stepOrder: TransactionStep[] = [
+        'items',
+        'pricing',
+        'payment',
+        'confirmation',
+        'printing',
+      ];
       const currentIndex = stepOrder.indexOf(transactionState.currentStep);
-      
+
       if (currentIndex < stepOrder.length - 1) {
         const nextStep = stepOrder[currentIndex + 1];
         await transactionStateManager.updateTransactionStep(transactionId, nextStep);
-        
+
         const updatedState = await transactionStateManager.getTransaction(transactionId);
         setTransactionState(updatedState);
-        
+
         toast.success(`Moved to ${nextStep} step`);
       }
     } catch (error) {
@@ -285,16 +302,22 @@ export const useTransactionState = (): UseTransactionStateReturn => {
 
     setIsLoading(true);
     try {
-      const stepOrder: TransactionStep[] = ['items', 'pricing', 'payment', 'confirmation', 'printing'];
+      const stepOrder: TransactionStep[] = [
+        'items',
+        'pricing',
+        'payment',
+        'confirmation',
+        'printing',
+      ];
       const currentIndex = stepOrder.indexOf(transactionState.currentStep);
-      
+
       if (currentIndex > 0) {
         const prevStep = stepOrder[currentIndex - 1];
         await transactionStateManager.updateTransactionStep(transactionId, prevStep);
-        
+
         const updatedState = await transactionStateManager.getTransaction(transactionId);
         setTransactionState(updatedState);
-        
+
         toast.success(`Moved to ${prevStep} step`);
       }
     } catch (error) {
@@ -312,7 +335,7 @@ export const useTransactionState = (): UseTransactionStateReturn => {
         isValid: false,
         errors: ['No active transaction'],
         warnings: [],
-        canProceed: false
+        canProceed: false,
       };
     }
 
@@ -326,7 +349,7 @@ export const useTransactionState = (): UseTransactionStateReturn => {
         isValid: false,
         errors: ['Validation failed'],
         warnings: [],
-        canProceed: false
+        canProceed: false,
       };
       setValidation(errorResult);
       return errorResult;
@@ -340,20 +363,20 @@ export const useTransactionState = (): UseTransactionStateReturn => {
     setIsLoading(true);
     try {
       const result = await transactionStateManager.completeTransaction(transactionId);
-      
+
       if (result) {
         toast.success(`Transaction completed: ${result.receiptNumber}`);
-        
+
         // Reset state
         setTransactionId(null);
         setTransactionState(null);
         setItems([]);
         setPayment(null);
         setValidation(null);
-        
+
         return result.id;
       }
-      
+
       return null;
     } catch (error) {
       console.error('Failed to complete transaction:', error);
@@ -371,9 +394,9 @@ export const useTransactionState = (): UseTransactionStateReturn => {
     setIsLoading(true);
     try {
       await transactionStateManager.suspendTransaction(transactionId);
-      
+
       toast.success('Transaction suspended');
-      
+
       // Reset state
       setTransactionId(null);
       setTransactionState(null);
@@ -389,48 +412,54 @@ export const useTransactionState = (): UseTransactionStateReturn => {
   }, [transactionId]);
 
   // Resume transaction
-  const resumeTransaction = useCallback(async (id: string) => {
-    setIsLoading(true);
-    try {
-      const state = await transactionStateManager.resumeTransaction(id);
-      
-      if (state) {
-        await loadTransaction(id);
-        toast.success('Transaction resumed');
-      } else {
-        toast.error('Could not resume transaction');
+  const resumeTransaction = useCallback(
+    async (id: string) => {
+      setIsLoading(true);
+      try {
+        const state = await transactionStateManager.resumeTransaction(id);
+
+        if (state) {
+          await loadTransaction(id);
+          toast.success('Transaction resumed');
+        } else {
+          toast.error('Could not resume transaction');
+        }
+      } catch (error) {
+        console.error('Failed to resume transaction:', error);
+        toast.error('Failed to resume transaction');
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error('Failed to resume transaction:', error);
-      toast.error('Failed to resume transaction');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [loadTransaction]);
+    },
+    [loadTransaction]
+  );
 
   // Cancel transaction
-  const cancelTransaction = useCallback(async (reason: string) => {
-    if (!transactionId) return;
+  const cancelTransaction = useCallback(
+    async (reason: string) => {
+      if (!transactionId) return;
 
-    setIsLoading(true);
-    try {
-      await transactionStateManager.cancelTransaction(transactionId, reason);
-      
-      toast.success('Transaction cancelled');
-      
-      // Reset state
-      setTransactionId(null);
-      setTransactionState(null);
-      setItems([]);
-      setPayment(null);
-      setValidation(null);
-    } catch (error) {
-      console.error('Failed to cancel transaction:', error);
-      toast.error('Failed to cancel transaction');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [transactionId]);
+      setIsLoading(true);
+      try {
+        await transactionStateManager.cancelTransaction(transactionId, reason);
+
+        toast.success('Transaction cancelled');
+
+        // Reset state
+        setTransactionId(null);
+        setTransactionState(null);
+        setItems([]);
+        setPayment(null);
+        setValidation(null);
+      } catch (error) {
+        console.error('Failed to cancel transaction:', error);
+        toast.error('Failed to cancel transaction');
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [transactionId]
+  );
 
   // Cleanup timeouts on unmount
   useEffect(() => {
@@ -451,19 +480,19 @@ export const useTransactionState = (): UseTransactionStateReturn => {
   const totalAmount = subtotal + tax;
 
   // Navigation helpers
-  const canProceedToNext = validation?.canProceed || false;
+  const canProceedToNext = validation?.canProceed ?? false;
   const canGoBack = transactionState?.currentStep !== 'items';
 
   return {
     // State
     transactionId,
     transactionState,
-    currentStep: transactionState?.currentStep || 'items',
+    currentStep: transactionState?.currentStep ?? 'items',
     items,
     payment,
     isLoading,
     validation,
-    
+
     // Actions
     startTransaction,
     addItems,
@@ -477,13 +506,13 @@ export const useTransactionState = (): UseTransactionStateReturn => {
     suspendTransaction,
     resumeTransaction,
     cancelTransaction,
-    
+
     // Utilities
     canProceedToNext,
     canGoBack,
     totalAmount,
     subtotal,
     tax,
-    discount
+    discount,
   };
 };

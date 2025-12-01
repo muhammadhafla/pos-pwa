@@ -4,13 +4,13 @@
  * Implements comprehensive state management for POS transactions
  */
 
-import { 
-  TransactionState, 
-  TransactionStateStatus, 
+import {
+  TransactionState,
+  TransactionStateStatus as _TransactionStateStatus,
   TransactionStep,
   CartItem,
   SalesTransaction,
-  PaymentBreakdown
+  PaymentBreakdown,
 } from '@/types';
 import { db } from '@/services/database/POSDatabase';
 
@@ -42,7 +42,10 @@ export interface TransactionContext {
 export class TransactionStateManager {
   private activeTransactions = new Map<string, TransactionState>();
   private transactionContexts = new Map<string, TransactionContext>();
-  private validationRules: Map<TransactionStep, (context: TransactionContext) => TransactionValidationResult> = new Map();
+  private validationRules: Map<
+    TransactionStep,
+    (context: TransactionContext) => TransactionValidationResult
+  > = new Map();
 
   constructor() {
     this.initializeValidationRules();
@@ -62,11 +65,7 @@ export class TransactionStateManager {
   /**
    * Start a new transaction
    */
-  async startTransaction(
-    userId: string,
-    branchId: string,
-    deviceId: string
-  ): Promise<string> {
+  async startTransaction(userId: string, branchId: string, deviceId: string): Promise<string> {
     const transactionId = crypto.randomUUID();
     const now = new Date();
 
@@ -79,26 +78,26 @@ export class TransactionStateManager {
         pricing: {},
         payment: {},
         confirmation: {},
-        printing: {}
+        printing: {},
       },
       validationErrors: {},
       lastUpdated: now,
-      startedAt: now
+      startedAt: now,
     };
 
     const context: TransactionContext = {
       transactionId,
       step: 'items',
       data: {
-        items: []
+        items: [],
       },
       metadata: {
         startedAt: now,
         lastUpdated: now,
         userId,
         branchId,
-        deviceId
-      }
+        deviceId,
+      },
     };
 
     // Store in memory for fast access
@@ -118,7 +117,7 @@ export class TransactionStateManager {
   async getTransaction(transactionId: string): Promise<TransactionState | null> {
     // Check memory first
     let state = this.activeTransactions.get(transactionId);
-    
+
     if (!state) {
       // Load from database
       state = await db.getTransactionState(transactionId);
@@ -127,14 +126,14 @@ export class TransactionStateManager {
       }
     }
 
-    return state || null;
+    return state ?? null;
   }
 
   /**
    * Get transaction context
    */
   getTransactionContext(transactionId: string): TransactionContext | null {
-    return this.transactionContexts.get(transactionId) || null;
+    return this.transactionContexts.get(transactionId) ?? null;
   }
 
   /**
@@ -168,7 +167,7 @@ export class TransactionStateManager {
     await db.updateTransactionState(transactionId, {
       currentStep: newStep,
       stepData: state.stepData,
-      lastUpdated: state.lastUpdated
+      lastUpdated: state.lastUpdated,
     });
 
     console.log(`📋 Transaction ${transactionId} moved to step: ${newStep}`);
@@ -195,7 +194,8 @@ export class TransactionStateManager {
       const existingIndex = updatedItems.findIndex(item => item.itemId === newItem.itemId);
       if (existingIndex >= 0) {
         updatedItems[existingIndex].quantity += newItem.quantity;
-        updatedItems[existingIndex].totalPrice = updatedItems[existingIndex].quantity * updatedItems[existingIndex].unitPrice;
+        updatedItems[existingIndex].totalPrice =
+          updatedItems[existingIndex].quantity * updatedItems[existingIndex].unitPrice;
       } else {
         updatedItems.push(newItem);
       }
@@ -206,7 +206,7 @@ export class TransactionStateManager {
 
     // Update step data
     return await this.updateTransactionStep(transactionId, context.step, {
-      items: updatedItems
+      items: updatedItems,
     });
   }
 
@@ -226,7 +226,7 @@ export class TransactionStateManager {
     context.metadata.lastUpdated = new Date();
 
     return await this.updateTransactionStep(transactionId, context.step, {
-      items: context.data.items
+      items: context.data.items,
     });
   }
 
@@ -258,7 +258,7 @@ export class TransactionStateManager {
     context.metadata.lastUpdated = new Date();
 
     return await this.updateTransactionStep(transactionId, context.step, {
-      items: context.data.items
+      items: context.data.items,
     });
   }
 
@@ -278,7 +278,7 @@ export class TransactionStateManager {
     context.metadata.lastUpdated = new Date();
 
     return await this.updateTransactionStep(transactionId, 'payment', {
-      payment
+      payment,
     });
   }
 
@@ -288,13 +288,13 @@ export class TransactionStateManager {
   async validateTransaction(transactionId: string): Promise<TransactionValidationResult> {
     const context = this.getTransactionContext(transactionId);
     const state = await this.getTransaction(transactionId);
-    
+
     if (!context || !state) {
       return {
         isValid: false,
         errors: ['Transaction not found'],
         warnings: [],
-        canProceed: false
+        canProceed: false,
       };
     }
 
@@ -304,7 +304,7 @@ export class TransactionStateManager {
         isValid: false,
         errors: [`No validator for step: ${state.currentStep}`],
         warnings: [],
-        canProceed: false
+        canProceed: false,
       };
     }
 
@@ -317,7 +317,7 @@ export class TransactionStateManager {
   async completeTransaction(transactionId: string): Promise<SalesTransaction | null> {
     const context = this.getTransactionContext(transactionId);
     const state = await this.getTransaction(transactionId);
-    
+
     if (!context || !state) {
       throw new Error('Transaction not found');
     }
@@ -342,7 +342,7 @@ export class TransactionStateManager {
       status: 'completed',
       receiptNumber: this.generateReceiptNumber(),
       createdAt: context.metadata.startedAt,
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
 
     // Save to sales queue
@@ -351,7 +351,7 @@ export class TransactionStateManager {
     // Mark transaction as completed
     await db.updateTransactionState(transactionId, {
       status: 'completed',
-      lastUpdated: new Date()
+      lastUpdated: new Date(),
     });
 
     // Clean up from memory
@@ -373,7 +373,7 @@ export class TransactionStateManager {
 
     await db.updateTransactionState(transactionId, {
       status: 'suspended',
-      lastUpdated: new Date()
+      lastUpdated: new Date(),
     });
 
     this.activeTransactions.delete(transactionId);
@@ -391,7 +391,7 @@ export class TransactionStateManager {
 
     await db.updateTransactionState(transactionId, {
       status: 'active',
-      lastUpdated: new Date()
+      lastUpdated: new Date(),
     });
 
     // Reload into memory
@@ -401,7 +401,7 @@ export class TransactionStateManager {
     }
 
     console.log(`▶️ Transaction resumed: ${transactionId}`);
-    return updatedState;
+    return updatedState ?? null;
   }
 
   /**
@@ -410,12 +410,12 @@ export class TransactionStateManager {
   async cancelTransaction(transactionId: string, reason: string): Promise<void> {
     await db.updateTransactionState(transactionId, {
       status: 'cancelled',
-      lastUpdated: new Date()
+      lastUpdated: new Date(),
     });
 
     this.activeTransactions.delete(transactionId);
     this.transactionContexts.delete(transactionId);
-    
+
     console.log(`❌ Transaction cancelled: ${transactionId} (${reason})`);
   }
 
@@ -431,7 +431,7 @@ export class TransactionStateManager {
     // Check if transaction is expired (24 hours)
     const now = new Date();
     const hoursSinceUpdate = (now.getTime() - state.lastUpdated.getTime()) / (1000 * 60 * 60);
-    
+
     if (hoursSinceUpdate > 24) {
       console.warn(`⏰ Transaction expired: ${transactionId}`);
       await this.cancelTransaction(transactionId, 'Expired due to inactivity');
@@ -471,10 +471,7 @@ export class TransactionStateManager {
    * Get all active transactions for user
    */
   async getActiveTransactions(userId: string): Promise<TransactionState[]> {
-    const allTransactions = await db.transactionStates
-      .where('status')
-      .equals('active')
-      .toArray();
+    const allTransactions = await db.transactionStates.where('status').equals('active').toArray();
 
     return allTransactions.filter(transaction => {
       const context = this.transactionContexts.get(transaction.id);
@@ -503,7 +500,7 @@ export class TransactionStateManager {
       isValid: errors.length === 0,
       errors,
       warnings,
-      canProceed: errors.length === 0 && context.data.items.length > 0
+      canProceed: errors.length === 0 && context.data.items.length > 0,
     };
   }
 
@@ -522,7 +519,7 @@ export class TransactionStateManager {
       isValid: errors.length === 0,
       errors,
       warnings,
-      canProceed: errors.length === 0
+      canProceed: errors.length === 0,
     };
   }
 
@@ -536,15 +533,16 @@ export class TransactionStateManager {
         isValid: false,
         errors,
         warnings,
-        canProceed: false
+        canProceed: false,
       };
     }
 
-    const totalPayment = context.data.payment.cash + 
-                        context.data.payment.card + 
-                        context.data.payment.ewallet + 
-                        context.data.payment.bankTransfer + 
-                        context.data.payment.credit;
+    const totalPayment =
+      context.data.payment.cash +
+      context.data.payment.card +
+      context.data.payment.ewallet +
+      context.data.payment.bankTransfer +
+      context.data.payment.credit;
 
     const totalAmount = this.calculateTotal(context.data.items);
 
@@ -560,7 +558,7 @@ export class TransactionStateManager {
       isValid: errors.length === 0,
       errors,
       warnings,
-      canProceed: errors.length === 0
+      canProceed: errors.length === 0,
     };
   }
 
@@ -577,16 +575,16 @@ export class TransactionStateManager {
       isValid: errors.length === 0,
       errors,
       warnings,
-      canProceed: errors.length === 0
+      canProceed: errors.length === 0,
     };
   }
 
-  private validatePrintingStep(context: TransactionContext): TransactionValidationResult {
+  private validatePrintingStep(_context: TransactionContext): TransactionValidationResult {
     return {
       isValid: true,
       errors: [],
       warnings: [],
-      canProceed: true
+      canProceed: true,
     };
   }
 
@@ -597,7 +595,7 @@ export class TransactionStateManager {
       pricing: ['items', 'payment'],
       payment: ['pricing', 'confirmation'],
       confirmation: ['payment', 'printing'],
-      printing: ['confirmation']
+      printing: ['confirmation'],
     };
 
     return validTransitions[fromStep]?.includes(toStep) || false;
@@ -623,7 +621,10 @@ export class TransactionStateManager {
 
   private generateReceiptNumber(): string {
     const now = new Date();
-    return `RCP-${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}-${now.getTime().toString().slice(-6)}`;
+    return `RCP-${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now
+      .getDate()
+      .toString()
+      .padStart(2, '0')}-${now.getTime().toString().slice(-6)}`;
   }
 }
 

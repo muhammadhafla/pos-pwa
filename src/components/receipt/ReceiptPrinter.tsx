@@ -4,18 +4,22 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { 
-  PrinterIcon, 
+import {
+  PrinterIcon,
   DocumentTextIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
   ClockIcon,
   XMarkIcon,
   ArrowPathIcon,
-  EyeIcon
+  EyeIcon,
 } from '@heroicons/react/24/outline';
 import { toast } from 'react-hot-toast';
-import { printQueueManager, PrintJob, PrintQueueStatus } from '@/services/receipt/PrintQueueManager';
+import {
+  printQueueManager,
+  PrintJob,
+  PrintQueueStatus,
+} from '@/services/receipt/PrintQueueManager';
 import { ReceiptData } from '@/services/receipt/ESCPosCommandGenerator';
 
 interface ReceiptPrinterProps {
@@ -26,7 +30,7 @@ interface ReceiptPrinterProps {
   autoPrint?: boolean;
 }
 
-interface QueueItem extends PrintJob {
+interface _QueueItem extends PrintJob {
   formatTime: string;
   formatAttempts: string;
 }
@@ -36,7 +40,7 @@ const ReceiptPrinter: React.FC<ReceiptPrinterProps> = ({
   receiptData,
   onPrintComplete,
   onPrintCancel,
-  autoPrint = false
+  autoPrint = false,
 }) => {
   const [currentJob, setCurrentJob] = useState<PrintJob | null>(null);
   const [queueStatus, setQueueStatus] = useState<PrintQueueStatus | null>(null);
@@ -49,7 +53,7 @@ const ReceiptPrinter: React.FC<ReceiptPrinterProps> = ({
   useEffect(() => {
     loadQueueStatus();
     loadPrinters();
-    
+
     if (autoPrint) {
       handlePrint();
     }
@@ -80,14 +84,14 @@ const ReceiptPrinter: React.FC<ReceiptPrinterProps> = ({
 
   const handlePrint = async () => {
     setIsLoading(true);
-    
+
     try {
       const jobId = await printQueueManager.addPrintJob(transactionId, receiptData, {
         printerName: selectedPrinter || undefined,
         priority: 'normal',
-        retryOnFailure: true
+        retryOnFailure: true,
       });
-      
+
       setCurrentJob({
         id: jobId,
         transactionId,
@@ -96,9 +100,9 @@ const ReceiptPrinter: React.FC<ReceiptPrinterProps> = ({
         status: 'pending',
         attempts: 0,
         maxAttempts: 4,
-        createdAt: new Date()
+        createdAt: new Date(),
       } as PrintJob);
-      
+
       // Simulate job completion after a short delay for demo
       setTimeout(() => {
         if (onPrintComplete) {
@@ -106,7 +110,6 @@ const ReceiptPrinter: React.FC<ReceiptPrinterProps> = ({
         }
         toast.success('Receipt sent to printer');
       }, 2000);
-      
     } catch (error) {
       console.error('Print job failed:', error);
       toast.error('Failed to send receipt to printer');
@@ -140,7 +143,7 @@ const ReceiptPrinter: React.FC<ReceiptPrinterProps> = ({
     return new Intl.DateTimeFormat('id-ID', {
       hour: '2-digit',
       minute: '2-digit',
-      second: '2-digit'
+      second: '2-digit',
     }).format(date);
   };
 
@@ -201,7 +204,7 @@ const ReceiptPrinter: React.FC<ReceiptPrinterProps> = ({
           <DocumentTextIcon className="h-6 w-6 text-blue-600 mr-2" />
           <h2 className="text-xl font-bold text-gray-900">Receipt Printer</h2>
         </div>
-        
+
         <div className="flex items-center space-x-2">
           <button
             onClick={() => setShowPreview(!showPreview)}
@@ -217,12 +220,8 @@ const ReceiptPrinter: React.FC<ReceiptPrinterProps> = ({
       {showPreview && (
         <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
           <div className="text-xs font-mono bg-white p-4 rounded border max-h-64 overflow-y-auto">
-            <div className="text-center font-bold">
-              {receiptData.header.storeName}
-            </div>
-            <div className="text-center text-xs">
-              {receiptData.header.storeAddress}
-            </div>
+            <div className="text-center font-bold">{receiptData.header.storeName}</div>
+            <div className="text-center text-xs">{receiptData.header.storeAddress}</div>
             <div className="mt-4">
               <div>No: {receiptData.transaction.receiptNumber}</div>
               <div>Kasir: {receiptData.transaction.cashierName}</div>
@@ -231,7 +230,9 @@ const ReceiptPrinter: React.FC<ReceiptPrinterProps> = ({
             <div className="mt-4 border-t border-dashed pt-2">
               {receiptData.items.map((item, index) => (
                 <div key={index} className="flex justify-between">
-                  <span>{item.name} x{item.quantity}</span>
+                  <span>
+                    {item.name} x{item.quantity}
+                  </span>
                   <span>Rp {item.totalPrice.toLocaleString('id-ID')}</span>
                 </div>
               ))}
@@ -249,12 +250,10 @@ const ReceiptPrinter: React.FC<ReceiptPrinterProps> = ({
       {/* Printer Selection */}
       {printerList.length > 0 && (
         <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Select Printer
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Select Printer</label>
           <select
             value={selectedPrinter}
-            onChange={(e) => setSelectedPrinter(e.target.value)}
+            onChange={e => setSelectedPrinter(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
             {printerList.map(printer => (
@@ -277,21 +276,17 @@ const ReceiptPrinter: React.FC<ReceiptPrinterProps> = ({
                   {getStatusIcon(currentJob.status)}
                   <span className="ml-2 font-medium">{getStatusText(currentJob.status)}</span>
                 </div>
-                <span className="text-sm text-gray-600">
-                  Job: {currentJob.id.split('-').pop()}
-                </span>
+                <span className="text-sm text-gray-600">Job: {currentJob.id.split('-').pop()}</span>
               </div>
-              
+
               {currentJob.attempts > 0 && (
                 <div className="mt-2 text-sm text-gray-600">
                   Attempts: {currentJob.attempts}/{currentJob.maxAttempts}
                 </div>
               )}
-              
+
               {currentJob.errorMessage && (
-                <div className="mt-2 text-sm text-red-600">
-                  Error: {currentJob.errorMessage}
-                </div>
+                <div className="mt-2 text-sm text-red-600">Error: {currentJob.errorMessage}</div>
               )}
             </div>
 
@@ -316,7 +311,7 @@ const ReceiptPrinter: React.FC<ReceiptPrinterProps> = ({
                   </button>
                 ) : null}
               </div>
-              
+
               <div className="text-sm text-gray-600">
                 {queueStatus && `${queueStatus.pendingJobs} jobs in queue`}
               </div>

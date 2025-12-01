@@ -86,7 +86,15 @@ export interface PricingCondition {
   value: string | number;
 }
 
-export type PricingRuleType = 'item' | 'category' | 'brand' | 'customer' | 'quantity' | 'time' | 'branch' | 'global';
+export type PricingRuleType =
+  | 'item'
+  | 'category'
+  | 'brand'
+  | 'customer'
+  | 'quantity'
+  | 'time'
+  | 'branch'
+  | 'global';
 export type DiscountType = 'percentage' | 'fixed_amount' | 'free_item';
 
 export interface CartItem {

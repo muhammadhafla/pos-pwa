@@ -12,16 +12,16 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 3,
-      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+      retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
       staleTime: 5 * 60 * 1000, // 5 minutes - reasonable for POS data
       cacheTime: 30 * 60 * 1000, // 30 minutes
       refetchOnWindowFocus: false, // Prevent unnecessary refetches
-      refetchOnReconnect: true
+      refetchOnReconnect: true,
     },
     mutations: {
       retry: 1,
-      retryDelay: 1000
-    }
+      retryDelay: 1000,
+    },
   },
 });
 
@@ -30,11 +30,11 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
     try {
       const registration = await navigator.serviceWorker.register('/sw.js', {
-        scope: '/'
+        scope: '/',
       });
-      
+
       console.log('✅ Service Worker registered successfully:', registration.scope);
-      
+
       // Listen for updates
       registration.addEventListener('updatefound', () => {
         const newWorker = registration.installing;
@@ -47,7 +47,6 @@ if ('serviceWorker' in navigator) {
           });
         }
       });
-      
     } catch (error) {
       console.error('❌ Service Worker registration failed:', error);
     }
@@ -59,14 +58,13 @@ const initializeApp = async () => {
   try {
     // Initialize IndexedDB
     await initializeDatabase();
-    
+
     // Start performance monitoring
     if (typeof performance !== 'undefined' && performance.mark) {
       performance.mark('app-start');
     }
-    
+
     console.log('🚀 POS PWA Retail System initialized successfully');
-    
   } catch (error) {
     console.error('❌ App initialization failed:', error);
     // Show user-friendly error message
@@ -108,11 +106,13 @@ const initializeApp = async () => {
 const handleNetworkChange = () => {
   const isOnline = navigator.onLine;
   console.log(`🌐 Network status: ${isOnline ? 'Online' : 'Offline'}`);
-  
+
   // Notify components about network status
-  window.dispatchEvent(new CustomEvent('network-status-changed', { 
-    detail: { isOnline } 
-  }));
+  window.dispatchEvent(
+    new CustomEvent('network-status-changed', {
+      detail: { isOnline },
+    })
+  );
 };
 
 window.addEventListener('online', handleNetworkChange);
@@ -132,20 +132,20 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               background: '#363636',
               color: '#fff',
               borderRadius: '8px',
-              fontSize: '14px'
+              fontSize: '14px',
             },
             success: {
               style: {
                 background: '#4caf50',
               },
-              duration: 3000
+              duration: 3000,
             },
             error: {
               style: {
                 background: '#f44336',
               },
-              duration: 5000
-            }
+              duration: 5000,
+            },
           }}
         />
       </BrowserRouter>
@@ -161,10 +161,10 @@ window.addEventListener('load', () => {
   if (typeof performance !== 'undefined' && performance.mark) {
     performance.mark('app-loaded');
     performance.measure('app-startup', 'app-start', 'app-loaded');
-    
+
     const measure = performance.getEntriesByName('app-startup')[0];
     console.log(`⚡ App startup time: ${measure.duration.toFixed(2)}ms`);
-    
+
     // Alert if startup is too slow (>2s target)
     if (measure.duration > 2000) {
       console.warn('⚠️ App startup time exceeded 2s target');

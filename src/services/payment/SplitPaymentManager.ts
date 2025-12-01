@@ -4,16 +4,15 @@
  * Supports Cash + QRIS and other payment combinations
  */
 
-import { 
-  SplitPayment, 
-  PaymentMethod, 
-  PaymentMethodAllocation, 
+import {
+  SplitPayment,
+  PaymentMethod,
+  PaymentMethodAllocation,
   SplitPaymentStatus,
-  CartItem,
-  PaymentBreakdown 
+
 } from '@/types';
 import { db } from '@/services/database/POSDatabase';
-import { toast } from 'react-hot-toast';
+import { toast as _toast } from 'react-hot-toast';
 
 export interface SplitPaymentValidation {
   isValid: boolean;
@@ -41,7 +40,6 @@ export interface SplitPaymentRequest {
 }
 
 export class SplitPaymentManager {
-  
   /**
    * Create new split payment
    */
@@ -55,7 +53,7 @@ export class SplitPaymentManager {
       method: alloc.method,
       amount: alloc.amount,
       reference: alloc.reference,
-      processingFee: alloc.processingFee || 0
+      processingFee: alloc.processingFee ?? 0,
     }));
 
     const splitPayment: Omit<SplitPayment, 'id'> = {
@@ -65,11 +63,11 @@ export class SplitPaymentManager {
       totalAllocated: this.calculateTotalAllocated(allocations),
       status: 'pending',
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
 
     const id = await db.createSplitPayment(splitPayment);
-    
+
     console.log(`💳 Split payment created: ${id}`);
     return id;
   }
@@ -79,7 +77,7 @@ export class SplitPaymentManager {
    */
   async getSplitPayment(transactionId: string): Promise<SplitPayment | null> {
     const payment = await db.getSplitPayment(transactionId);
-    return payment || null;
+    return payment ?? null;
   }
 
   /**
@@ -106,14 +104,14 @@ export class SplitPaymentManager {
         updatedAllocations[existingIndex] = {
           ...updatedAllocations[existingIndex],
           amount,
-          reference
+          reference,
         };
       }
     } else if (amount > 0) {
       updatedAllocations.push({
         method,
         amount,
-        reference
+        reference,
       });
     }
 
@@ -123,7 +121,7 @@ export class SplitPaymentManager {
     await db.updateSplitPayment(splitPaymentId, {
       paymentMethods: updatedAllocations,
       totalAllocated,
-      status: newStatus
+      status: newStatus,
     });
 
     console.log(`💳 Split payment updated: ${splitPaymentId}`);
@@ -145,7 +143,7 @@ export class SplitPaymentManager {
 
     await db.updateSplitPayment(splitPaymentId, {
       status: 'complete',
-      updatedAt: new Date()
+      updatedAt: new Date(),
     });
 
     console.log(`✅ Split payment completed: ${splitPaymentId}`);
@@ -162,22 +160,22 @@ export class SplitPaymentManager {
     switch (method) {
       case 'cash':
         return this.processCashPayment(amount);
-      
+
       case 'card':
         return this.processCardPayment(amount, reference);
-      
+
       case 'qris':
         return this.processQRISPayment(amount, reference);
-      
+
       case 'ewallet':
         return this.processEWalletPayment(amount, reference);
-      
+
       case 'bank_transfer':
         return this.processBankTransfer(amount, reference);
-      
+
       case 'credit':
         return this.processCreditPayment(amount, reference);
-      
+
       default:
         return { success: false, error: `Unsupported payment method: ${method}` };
     }
@@ -196,7 +194,7 @@ export class SplitPaymentManager {
     if (customerPreference && availableMethods.includes(customerPreference)) {
       suggestions.push({
         method: customerPreference,
-        amount: totalAmount
+        amount: totalAmount,
       });
       return suggestions;
     }
@@ -206,7 +204,7 @@ export class SplitPaymentManager {
       // Suggest split between cash and QRIS
       const cashAmount = Math.floor(totalAmount * 0.3); // 30% cash
       const qrisAmount = totalAmount - cashAmount;
-      
+
       suggestions.push(
         { method: 'cash', amount: cashAmount },
         { method: 'qris', amount: qrisAmount }
@@ -252,12 +250,16 @@ export class SplitPaymentManager {
       const totalAllocated = this.calculateTotalAllocated(
         request.allocations.map(alloc => ({
           method: alloc.method,
-          amount: alloc.amount
+          amount: alloc.amount,
         }))
       );
 
       if (totalAllocated < request.totalAmount) {
-        errors.push(`Allocated amount (${totalAllocated.toFixed(2)}) is less than total (${request.totalAmount.toFixed(2)})`);
+        errors.push(
+          `Allocated amount (${totalAllocated.toFixed(
+            2
+          )}) is less than total (${request.totalAmount.toFixed(2)})`
+        );
       }
 
       if (totalAllocated > request.totalAmount * 1.5) {
@@ -276,11 +278,15 @@ export class SplitPaymentManager {
 
         // Method-specific validations
         if (alloc.method === 'cash' && alloc.amount > 1000000) {
-          warnings.push(`Allocation ${index + 1}: Large cash amount (${alloc.amount.toLocaleString()})`);
+          warnings.push(
+            `Allocation ${index + 1}: Large cash amount (${alloc.amount.toLocaleString()})`
+          );
         }
 
         if ((alloc.method === 'card' || alloc.method === 'qris') && !alloc.reference) {
-          warnings.push(`Allocation ${index + 1}: ${alloc.method} payment should have reference number`);
+          warnings.push(
+            `Allocation ${index + 1}: ${alloc.method} payment should have reference number`
+          );
         }
       });
     }
@@ -289,7 +295,7 @@ export class SplitPaymentManager {
       isValid: errors.length === 0,
       errors,
       warnings,
-      canProcess: errors.length === 0
+      canProcess: errors.length === 0,
     };
   }
 
@@ -325,7 +331,7 @@ export class SplitPaymentManager {
       isValid: errors.length === 0,
       errors,
       warnings,
-      canProcess: errors.length === 0
+      canProcess: errors.length === 0,
     };
   }
 
@@ -350,7 +356,14 @@ export class SplitPaymentManager {
    * Check if payment method is valid
    */
   private isValidPaymentMethod(method: PaymentMethod): boolean {
-    const validMethods: PaymentMethod[] = ['cash', 'card', 'ewallet', 'bank_transfer', 'credit', 'qris'];
+    const validMethods: PaymentMethod[] = [
+      'cash',
+      'card',
+      'ewallet',
+      'bank_transfer',
+      'credit',
+      'qris',
+    ];
     return validMethods.includes(method);
   }
 
@@ -375,81 +388,98 @@ export class SplitPaymentManager {
   }
 
   // Payment processing methods (simulated)
-  private async processCashPayment(amount: number): Promise<{ success: boolean; transactionId?: string; error?: string }> {
+  private async processCashPayment(
+    _amount: number
+  ): Promise<{ success: boolean; transactionId?: string; error?: string }> {
     // Simulate cash payment processing
     await new Promise(resolve => setTimeout(resolve, 500));
-    
+
     return {
       success: true,
-      transactionId: `CASH-${Date.now()}`
+      transactionId: `CASH-${Date.now()}`,
     };
   }
 
-  private async processCardPayment(amount: number, reference?: string): Promise<{ success: boolean; transactionId?: string; error?: string }> {
+  private async processCardPayment(
+    amount: number,
+    reference?: string
+  ): Promise<{ success: boolean; transactionId?: string; error?: string }> {
     // Simulate card payment processing
     await new Promise(resolve => setTimeout(resolve, 2000));
-    
+
     // Simulate 95% success rate
     if (Math.random() > 0.05) {
       return {
         success: true,
         transactionId: `CARD-${Date.now()}`,
-        error: reference ? `Approved: ${reference}` : undefined
+        error: reference ? `Approved: ${reference}` : undefined,
       };
     } else {
       return {
         success: false,
-        error: 'Card payment declined'
+        error: 'Card payment declined',
       };
     }
   }
 
-  private async processQRISPayment(amount: number, reference?: string): Promise<{ success: boolean; transactionId?: string; error?: string }> {
+  private async processQRISPayment(
+    amount: number,
+    reference?: string
+  ): Promise<{ success: boolean; transactionId?: string; error?: string }> {
     // Simulate QRIS payment processing
     await new Promise(resolve => setTimeout(resolve, 1500));
-    
+
     // Simulate 98% success rate
     if (Math.random() > 0.02) {
       return {
         success: true,
         transactionId: `QRIS-${Date.now()}`,
-        error: reference ? `QR Code: ${reference}` : undefined
+        error: reference ? `QR Code: ${reference}` : undefined,
       };
     } else {
       return {
         success: false,
-        error: 'QRIS payment timeout'
+        error: 'QRIS payment timeout',
       };
     }
   }
 
-  private async processEWalletPayment(amount: number, reference?: string): Promise<{ success: boolean; transactionId?: string; error?: string }> {
+  private async processEWalletPayment(
+    _amount: number,
+    _reference?: string
+  ): Promise<{ success: boolean; transactionId?: string; error?: string }> {
     // Simulate e-wallet payment processing
     await new Promise(resolve => setTimeout(resolve, 1000));
-    
+
     return {
       success: true,
-      transactionId: `EWALLET-${Date.now()}`
+      transactionId: `EWALLET-${Date.now()}`,
     };
   }
 
-  private async processBankTransfer(amount: number, reference?: string): Promise<{ success: boolean; transactionId?: string; error?: string }> {
+  private async processBankTransfer(
+    _amount: number,
+    _reference?: string
+  ): Promise<{ success: boolean; transactionId?: string; error?: string }> {
     // Simulate bank transfer processing
     await new Promise(resolve => setTimeout(resolve, 3000));
-    
+
     return {
       success: true,
-      transactionId: `BANK-${Date.now()}`
+      transactionId: `BANK-${Date.now()}`,
     };
   }
 
-  private async processCreditPayment(amount: number, reference?: string): Promise<{ success: boolean; transactionId?: string; error?: string }> {
+  private async processCreditPayment(
+    _amount: number,
+    _reference?: string
+  ): Promise<{ success: boolean; transactionId?: string; error?: string }> {
     // Simulate credit payment processing
     await new Promise(resolve => setTimeout(resolve, 2500));
-    
+
     return {
       success: true,
-      transactionId: `CREDIT-${Date.now()}`
+      transactionId: `CREDIT-${Date.now()}`,
     };
   }
 
@@ -469,52 +499,54 @@ export class SplitPaymentManager {
         icon: '💵',
         color: 'green',
         processingTime: 'Instant',
-        fees: 'None'
+        fees: 'None',
       },
       card: {
         name: 'Credit/Debit Card',
         icon: '💳',
         color: 'blue',
         processingTime: '2-5 seconds',
-        fees: '1-3%'
+        fees: '1-3%',
       },
       qris: {
         name: 'QRIS',
         icon: '📱',
         color: 'purple',
         processingTime: '1-3 seconds',
-        fees: '0.5-1%'
+        fees: '0.5-1%',
       },
       ewallet: {
         name: 'E-Wallet',
         icon: '📲',
         color: 'orange',
         processingTime: '1-2 seconds',
-        fees: '1-2%'
+        fees: '1-2%',
       },
       bank_transfer: {
         name: 'Bank Transfer',
         icon: '🏦',
         color: 'indigo',
         processingTime: 'Instant',
-        fees: 'None'
+        fees: 'None',
       },
       credit: {
         name: 'Store Credit',
         icon: '🪙',
         color: 'yellow',
         processingTime: 'Instant',
-        fees: 'None'
-      }
+        fees: 'None',
+      },
     };
 
-    return info[method] || {
-      name: method,
-      icon: '💳',
-      color: 'gray',
-      processingTime: 'Unknown',
-      fees: 'Unknown'
-    };
+    return (
+      info[method] || {
+        name: method,
+        icon: '💳',
+        color: 'gray',
+        processingTime: 'Unknown',
+        fees: 'Unknown',
+      }
+    );
   }
 }
 

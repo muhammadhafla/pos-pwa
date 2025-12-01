@@ -5,7 +5,7 @@
  */
 
 import { SalesTransaction, TransactionStatus, PaymentBreakdown, CartItem, User } from '@/types';
-import { db } from './POSDatabase'
+import { db } from './POSDatabase';
 
 export interface TransactionState {
   id: string;
@@ -59,7 +59,7 @@ export interface ValidationError {
   severity: 'error' | 'warning';
 }
 
-export type TransactionStep = 
+export type TransactionStep =
   | 'init'
   | 'item_selection'
   | 'payment_processing'
@@ -121,18 +121,17 @@ export class TransactionStateManager {
   private async initializeStateManager(): Promise<void> {
     try {
       console.log('💼 Initializing Transaction State Manager...');
-      
+
       // Load any pending transactions from database
       await this.loadPendingTransactions();
-      
+
       // Start background recovery process
       this.startRecoveryProcess();
-      
+
       // Register for app state changes (beforeunload, etc.)
       this.registerEventListeners();
-      
+
       console.log('✅ Transaction State Manager initialized');
-      
     } catch (error) {
       console.error('❌ Transaction State Manager initialization failed:', error);
     }
@@ -143,7 +142,7 @@ export class TransactionStateManager {
    */
   async startTransaction(context: TransactionContext): Promise<TransactionState> {
     const transactionId = crypto.randomUUID();
-    
+
     const transaction: TransactionState = {
       id: transactionId,
       status: 'pending',
@@ -154,7 +153,7 @@ export class TransactionStateManager {
         subtotalAmount: 0,
         taxAmount: 0,
         discountAmount: 0,
-        pricingDetails: {}
+        pricingDetails: {},
       },
       metadata: {
         branchId: context.branchId,
@@ -162,26 +161,26 @@ export class TransactionStateManager {
         deviceId: context.deviceId,
         startedAt: new Date(),
         syncAttempts: 0,
-        errorHistory: []
+        errorHistory: [],
       },
       validationErrors: [],
       lastUpdate: new Date(),
       retryCount: 0,
-      maxRetries: 3
+      maxRetries: 3,
     };
 
     // Store in database for persistence
     await this.saveTransaction(transaction);
-    
+
     // Set as current transaction
     this.currentTransaction = transaction;
     this.context = context;
-    
+
     // Notify listeners
     this.notifyStateChange(transaction);
-    
+
     console.log(`🚀 Started transaction: ${transactionId}`);
-    
+
     return transaction;
   }
 
@@ -196,7 +195,7 @@ export class TransactionStateManager {
     const updatedTransaction: TransactionState = {
       ...this.currentTransaction,
       ...updates,
-      lastUpdate: new Date()
+      lastUpdate: new Date(),
     };
 
     // Validate state transition
@@ -211,15 +210,17 @@ export class TransactionStateManager {
 
     // Update in database
     await this.saveTransaction(updatedTransaction);
-    
+
     // Update current transaction
     this.currentTransaction = updatedTransaction;
-    
+
     // Notify listeners
     this.notifyStateChange(updatedTransaction);
-    
-    console.log(`🔄 Updated transaction: ${updatedTransaction.id} → ${updatedTransaction.currentStep}`);
-    
+
+    console.log(
+      `🔄 Updated transaction: ${updatedTransaction.id} → ${updatedTransaction.currentStep}`
+    );
+
     return updatedTransaction;
   }
 
@@ -232,17 +233,17 @@ export class TransactionStateManager {
     }
 
     const updatedItems = [...this.currentTransaction.data.items, ...items];
-    
+
     // Recalculate totals
     const totals = this.calculateTransactionTotals(updatedItems);
-    
+
     return await this.updateTransaction({
       data: {
         ...this.currentTransaction.data,
         items: updatedItems,
-        ...totals
+        ...totals,
       },
-      currentStep: 'item_selection'
+      currentStep: 'item_selection',
     });
   }
 
@@ -255,8 +256,11 @@ export class TransactionStateManager {
     }
 
     // Validate payment method
-    const validation = this.validatePaymentMethod(paymentMethod, this.currentTransaction.data.totalAmount);
-    
+    const validation = this.validatePaymentMethod(
+      paymentMethod,
+      this.currentTransaction.data.totalAmount
+    );
+
     if (!validation.isValid) {
       throw new Error(`Invalid payment method: ${validation.error}`);
     }
@@ -264,9 +268,9 @@ export class TransactionStateManager {
     return await this.updateTransaction({
       data: {
         ...this.currentTransaction.data,
-        paymentMethod
+        paymentMethod,
       },
-      currentStep: 'payment_processing'
+      currentStep: 'payment_processing',
     });
   }
 
@@ -281,22 +285,22 @@ export class TransactionStateManager {
     try {
       // Validate transaction before completion
       const validationResult = this.validateTransaction(this.currentTransaction);
-      
+
       if (!validationResult.isValid) {
         throw new Error(`Transaction validation failed: ${validationResult.error}`);
       }
 
       // Generate receipt number
       const receiptNumber = await this.generateReceiptNumber();
-      
+
       // Update transaction state
       const updatedTransaction = await this.updateTransaction({
         data: {
           ...this.currentTransaction.data,
-          receiptNumber
+          receiptNumber,
         },
         status: 'completed',
-        currentStep: 'completed'
+        currentStep: 'completed',
       });
 
       // Create final SalesTransaction
@@ -317,7 +321,7 @@ export class TransactionStateManager {
         updatedAt: updatedTransaction.lastUpdate,
         syncedAt: undefined,
         erpnextDocType: undefined,
-        erpnextDocName: undefined
+        erpnextDocName: undefined,
       };
 
       // Save to sales queue for ERPNext sync
@@ -325,14 +329,13 @@ export class TransactionStateManager {
 
       // Clear current transaction
       this.currentTransaction = null;
-      
+
       // Add to history
       this.transactionHistory.push(updatedTransaction);
-      
+
       console.log(`✅ Completed transaction: ${updatedTransaction.id}`);
-      
+
       return salesTransaction;
-      
     } catch (error) {
       // Mark transaction as failed
       if (this.currentTransaction) {
@@ -341,7 +344,7 @@ export class TransactionStateManager {
           error instanceof Error ? error.message : 'Unknown error'
         );
       }
-      
+
       throw error;
     }
   }
@@ -356,25 +359,29 @@ export class TransactionStateManager {
 
     await this.updateTransaction({
       status: 'failed',
-      currentStep: 'cancelled'
+      currentStep: 'cancelled',
     });
 
     this.currentTransaction = null;
-    
-    console.log(`❌ Cancelled transaction: ${reason || 'No reason provided'}`);
+
+    console.log(`❌ Cancelled transaction: ${reason ?? 'No reason provided'}`);
   }
 
   /**
    * Recover from failed transaction
    */
   async recoverTransaction(
-    transactionId: string, 
-    options: RecoveryOptions = { autoRecovery: false, maxRecoveryTime: 30000, skipValidation: false }
+    transactionId: string,
+    options: RecoveryOptions = {
+      autoRecovery: false,
+      maxRecoveryTime: 30000,
+      skipValidation: false,
+    }
   ): Promise<boolean> {
     try {
       // Load transaction from database
       const transaction = await this.getTransaction(transactionId);
-      
+
       if (!transaction) {
         throw new Error('Transaction not found for recovery');
       }
@@ -386,30 +393,29 @@ export class TransactionStateManager {
 
       // Attempt recovery
       const startTime = Date.now();
-      
+
       if (options.skipValidation) {
         // Force complete the transaction
         await this.forceCompleteTransaction(transaction);
       } else {
         // Validate and complete normally
         const validationResult = this.validateTransaction(transaction);
-        
+
         if (!validationResult.isValid) {
           throw new Error(`Recovery validation failed: ${validationResult.error}`);
         }
-        
+
         await this.completeTransaction();
       }
 
       const recoveryTime = Date.now() - startTime;
-      
+
       console.log(`🔧 Recovered transaction: ${transactionId} in ${recoveryTime}ms`);
-      
+
       // Notify recovery listeners
       this.notifyRecovery(transaction);
-      
+
       return true;
-      
     } catch (error) {
       console.error(`❌ Failed to recover transaction ${transactionId}:`, error);
       return false;
@@ -425,17 +431,16 @@ export class TransactionStateManager {
       if (this.currentTransaction?.id === id) {
         return this.currentTransaction;
       }
-      
+
       // Check transaction history
       const historyTransaction = this.transactionHistory.find(t => t.id === id);
       if (historyTransaction) {
         return historyTransaction;
       }
-      
+
       // Load from database
       // This would load from a transaction_states table if it existed
       return null;
-      
     } catch (error) {
       console.error('Failed to get transaction:', error);
       return null;
@@ -450,7 +455,6 @@ export class TransactionStateManager {
       // This would query pending transactions from database
       // For now, return the recovery queue
       return [...this.recoveryQueue];
-      
     } catch (error) {
       console.error('Failed to get pending transactions:', error);
       return [];
@@ -464,20 +468,23 @@ export class TransactionStateManager {
     try {
       // This would query transaction statistics from database
       const totalTransactions = this.transactionHistory.length;
-      const successfulTransactions = this.transactionHistory.filter(t => t.status === 'completed').length;
+      const successfulTransactions = this.transactionHistory.filter(
+        t => t.status === 'completed'
+      ).length;
       const failedTransactions = this.transactionHistory.filter(t => t.status === 'failed').length;
-      
+
       // Calculate average processing time
       const processingTimes = this.transactionHistory
         .filter(t => t.metadata.processingTime)
         .map(t => t.metadata.processingTime!);
-      
-      const averageProcessingTime = processingTimes.length > 0
-        ? processingTimes.reduce((sum, time) => sum + time, 0) / processingTimes.length
-        : 0;
-      
+
+      const averageProcessingTime =
+        processingTimes.length > 0
+          ? processingTimes.reduce((sum, time) => sum + time, 0) / processingTimes.length
+          : 0;
+
       const errorRate = totalTransactions > 0 ? (failedTransactions / totalTransactions) * 100 : 0;
-      
+
       // Count common errors
       const commonErrors: Record<string, number> = {};
       this.transactionHistory.forEach(transaction => {
@@ -492,9 +499,8 @@ export class TransactionStateManager {
         failedTransactions,
         averageProcessingTime,
         errorRate,
-        commonErrors
+        commonErrors,
       };
-      
     } catch (error) {
       console.error('Failed to get transaction statistics:', error);
       throw error;
@@ -516,14 +522,17 @@ export class TransactionStateManager {
       subtotalAmount,
       discountAmount,
       taxAmount,
-      totalAmount
+      totalAmount,
     };
   }
 
   /**
    * Validate state transition
    */
-  private validateStateTransition(from: TransactionState, to: TransactionState): { isValid: boolean; error?: string } {
+  private validateStateTransition(
+    from: TransactionState,
+    to: TransactionState
+  ): { isValid: boolean; error?: string } {
     // Define valid state transitions
     const validTransitions: Record<TransactionStep, TransactionStep[]> = {
       init: ['item_selection', 'cancelled'],
@@ -534,15 +543,15 @@ export class TransactionStateManager {
       syncing: ['completed', 'failed'],
       completed: [],
       failed: [],
-      cancelled: []
+      cancelled: [],
     };
 
     const allowed = validTransitions[from.currentStep];
-    
+
     if (!allowed.includes(to.currentStep)) {
       return {
         isValid: false,
-        error: `Invalid transition from ${from.currentStep} to ${to.currentStep}`
+        error: `Invalid transition from ${from.currentStep} to ${to.currentStep}`,
       };
     }
 
@@ -552,17 +561,21 @@ export class TransactionStateManager {
   /**
    * Validate payment method
    */
-  private validatePaymentMethod(payment: PaymentBreakdown, totalAmount: number): { isValid: boolean; error?: string } {
-    const totalPayment = payment.cash + payment.card + payment.ewallet + payment.bankTransfer + payment.credit;
-    
+  private validatePaymentMethod(
+    payment: PaymentBreakdown,
+    totalAmount: number
+  ): { isValid: boolean; error?: string } {
+    const totalPayment =
+      payment.cash + payment.card + payment.ewallet + payment.bankTransfer + payment.credit;
+
     if (totalPayment <= 0) {
       return { isValid: false, error: 'Total payment must be greater than zero' };
     }
-    
+
     if (totalPayment < totalAmount) {
       return { isValid: false, error: 'Insufficient payment amount' };
     }
-    
+
     return { isValid: true };
   }
 
@@ -578,7 +591,7 @@ export class TransactionStateManager {
         field: 'items',
         message: 'Transaction must have at least one item',
         code: 'NO_ITEMS',
-        severity: 'error'
+        severity: 'error',
       });
     }
 
@@ -588,7 +601,7 @@ export class TransactionStateManager {
         field: 'payment',
         message: 'Payment method is required',
         code: 'NO_PAYMENT_METHOD',
-        severity: 'error'
+        severity: 'error',
       });
     }
 
@@ -598,14 +611,14 @@ export class TransactionStateManager {
         field: 'total',
         message: 'Total amount must be positive',
         code: 'INVALID_AMOUNT',
-        severity: 'error'
+        severity: 'error',
       });
     }
 
     if (validationErrors.length > 0) {
       return {
         isValid: false,
-        error: `Validation failed: ${validationErrors.map(e => e.message).join(', ')}`
+        error: `Validation failed: ${validationErrors.map(e => e.message).join(', ')}`,
       };
     }
 
@@ -620,13 +633,13 @@ export class TransactionStateManager {
     // 1. It's not already completed
     // 2. It's not cancelled
     // 3. It's not too old (within recovery window)
-    
+
     const maxAge = 24 * 60 * 60 * 1000; // 24 hours
     const age = Date.now() - transaction.metadata.startedAt.getTime();
-    
-    return transaction.status !== 'completed' && 
-           transaction.currentStep !== 'cancelled' && 
-           age < maxAge;
+
+    return (
+      transaction.status !== 'completed' && transaction.currentStep !== 'cancelled' && age < maxAge
+    );
   }
 
   /**
@@ -644,20 +657,20 @@ export class TransactionStateManager {
       discountAmount: transaction.data.discountAmount,
       taxAmount: transaction.data.taxAmount,
       totalAmount: transaction.data.totalAmount,
-      paymentMethod: transaction.data.paymentMethod || {
+      paymentMethod: transaction.data.paymentMethod ?? {
         cash: transaction.data.totalAmount,
         card: 0,
         ewallet: 0,
         bankTransfer: 0,
-        credit: 0
+        credit: 0,
       },
       status: 'completed',
-      receiptNumber: transaction.data.receiptNumber || await this.generateReceiptNumber(),
+      receiptNumber: transaction.data.receiptNumber ?? (await this.generateReceiptNumber()),
       createdAt: transaction.metadata.startedAt,
       updatedAt: new Date(),
       syncedAt: undefined,
       erpnextDocType: undefined,
-      erpnextDocName: undefined
+      erpnextDocName: undefined,
     };
 
     await db.salesQueue.add(salesTransaction);
@@ -707,11 +720,11 @@ export class TransactionStateManager {
             error,
             timestamp: new Date(),
             recoverable: true,
-            retryable: true
-          }
-        ]
+            retryable: true,
+          },
+        ],
       },
-      lastUpdate: new Date()
+      lastUpdate: new Date(),
     };
 
     await this.saveTransaction(updatedTransaction);
@@ -724,13 +737,9 @@ export class TransactionStateManager {
   private async loadPendingTransactions(): Promise<void> {
     try {
       // Load pending sales transactions
-      const pendingSales = await db.salesQueue
-        .where('status')
-        .equals('pending')
-        .toArray();
+      const pendingSales = await db.salesQueue.where('status').equals('pending').toArray();
 
       console.log(`📥 Loaded ${pendingSales.length} pending transactions`);
-      
     } catch (error) {
       console.error('Failed to load pending transactions:', error);
     }
@@ -744,14 +753,14 @@ export class TransactionStateManager {
     setInterval(async () => {
       try {
         const pendingTransactions = await this.getPendingTransactions();
-        
+
         for (const transaction of pendingTransactions) {
           // Attempt automatic recovery for simple failures
           if (this.isSimpleRecovery(transaction)) {
             await this.recoverTransaction(transaction.id, {
               autoRecovery: true,
               maxRecoveryTime: 30000,
-              skipValidation: true
+              skipValidation: true,
             });
           }
         }
@@ -769,10 +778,12 @@ export class TransactionStateManager {
     // 1. No validation errors
     // 2. Has all required data
     // 3. Error is network-related or temporary
-    
-    return transaction.validationErrors.length === 0 &&
-           transaction.data.items.length > 0 &&
-           transaction.data.paymentMethod !== undefined;
+
+    return (
+      transaction.validationErrors.length === 0 &&
+      transaction.data.items.length > 0 &&
+      transaction.data.paymentMethod !== undefined
+    );
   }
 
   /**
@@ -800,10 +811,7 @@ export class TransactionStateManager {
   private persistCurrentTransaction(): void {
     if (this.currentTransaction) {
       try {
-        localStorage.setItem(
-          'pos_current_transaction',
-          JSON.stringify(this.currentTransaction)
-        );
+        localStorage.setItem('pos_current_transaction', JSON.stringify(this.currentTransaction));
         console.log('💾 Transaction persisted to localStorage');
       } catch (error) {
         console.error('Failed to persist transaction:', error);
@@ -817,10 +825,10 @@ export class TransactionStateManager {
   private checkForRecovery(): void {
     try {
       const persisted = localStorage.getItem('pos_current_transaction');
-      
+
       if (persisted) {
         const transaction: TransactionState = JSON.parse(persisted);
-        
+
         if (this.isRecoverable(transaction)) {
           console.log('🔄 Found persisted transaction, checking for recovery...');
           // Add to recovery queue

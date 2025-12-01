@@ -4,11 +4,12 @@
 
 /* Custom POS styles */
 @layer base {
-  html, body {
+  html,
+  body {
     @apply h-full;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   }
-  
+
   #root {
     @apply h-full;
   }
@@ -18,35 +19,35 @@
   .pos-button {
     @apply px-4 py-2 rounded-lg font-medium transition-colors duration-200;
   }
-  
+
   .pos-button-primary {
     @apply bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800;
   }
-  
+
   .pos-button-secondary {
     @apply bg-gray-200 text-gray-800 hover:bg-gray-300 active:bg-gray-400;
   }
-  
+
   .pos-button-danger {
     @apply bg-red-600 text-white hover:bg-red-700 active:bg-red-800;
   }
-  
+
   .pos-card {
     @apply bg-white rounded-lg shadow-sm border border-gray-200 p-4;
   }
-  
+
   .pos-input {
     @apply w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
   }
-  
+
   .scanner-active {
     @apply border-4 border-green-400 bg-green-50;
   }
-  
+
   .offline-indicator {
     @apply fixed top-0 left-0 right-0 bg-red-600 text-white text-center py-2 z-50;
   }
-  
+
   .sync-indicator {
     @apply fixed bottom-4 right-4 bg-blue-600 text-white rounded-full p-3 shadow-lg;
   }
@@ -56,23 +57,30 @@
   .scan-target {
     animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
-  
+
   @keyframes pulse {
-    0%, 100% {
+    0%,
+    100% {
       opacity: 1;
     }
     50% {
-      opacity: .5;
+      opacity: 0.5;
     }
   }
-  
+
   .transaction-success {
     animation: success-pulse 0.6s ease-in-out;
   }
-  
+
   @keyframes success-pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); }
+    0% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.05);
+    }
+    100% {
+      transform: scale(1);
+    }
   }
 }

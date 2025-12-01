@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const LoadingScreen: React.FC = () => {
   const [progress, setProgress] = useState(0);
@@ -23,9 +23,9 @@ const LoadingScreen: React.FC = () => {
         <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
         <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading POS System</h2>
         <p className="text-gray-600 mb-4">Initializing database and services...</p>
-        
+
         <div className="w-64 bg-gray-200 rounded-full h-2 mx-auto">
-          <div 
+          <div
             className="bg-blue-600 h-2 rounded-full transition-all duration-300"
             style={{ width: `${progress}%` }}
           ></div>

@@ -67,8 +67,8 @@ export interface ReceiptPayment {
 }
 
 export class ESCPosCommandGenerator {
-  private readonly ESC = 0x1B;
-  private readonly GS = 0x1D;
+  private readonly ESC = 0x1b;
+  private readonly GS = 0x1d;
 
   /**
    * Initialize printer
@@ -76,7 +76,7 @@ export class ESCPosCommandGenerator {
   initializePrinter(): ESCPosCommand {
     return {
       command: [this.ESC, 0x40], // ESC @
-      description: 'Initialize printer'
+      description: 'Initialize printer',
     };
   }
 
@@ -88,7 +88,7 @@ export class ESCPosCommandGenerator {
     const heightBit = Math.max(0, Math.min(7, height - 1));
     return {
       command: [this.GS, 0x21, widthBit | heightBit], // GS ! n
-      description: `Set character size: ${width}x${height}`
+      description: `Set character size: ${width}x${height}`,
     };
   }
 
@@ -99,7 +99,7 @@ export class ESCPosCommandGenerator {
     const alignMap = { left: 0, center: 1, right: 2 };
     return {
       command: [this.ESC, 0x61, alignMap[alignment]], // ESC a n
-      description: `Set alignment: ${alignment}`
+      description: `Set alignment: ${alignment}`,
     };
   }
 
@@ -109,7 +109,7 @@ export class ESCPosCommandGenerator {
   setEmphasis(enabled: boolean): ESCPosCommand {
     return {
       command: [this.ESC, 0x45, enabled ? 1 : 0], // ESC E n
-      description: `Set emphasis: ${enabled ? 'on' : 'off'}`
+      description: `Set emphasis: ${enabled ? 'on' : 'off'}`,
     };
   }
 
@@ -119,7 +119,7 @@ export class ESCPosCommandGenerator {
   setDoubleStrike(enabled: boolean): ESCPosCommand {
     return {
       command: [this.ESC, 0x47, enabled ? 1 : 0], // ESC G n
-      description: `Set double strike: ${enabled ? 'on' : 'off'}`
+      description: `Set double strike: ${enabled ? 'on' : 'off'}`,
     };
   }
 
@@ -129,7 +129,7 @@ export class ESCPosCommandGenerator {
   feedLines(lines: number = 1): ESCPosCommand {
     return {
       command: [this.ESC, 0x64, lines], // ESC d n
-      description: `Feed ${lines} line(s)`
+      description: `Feed ${lines} line(s)`,
     };
   }
 
@@ -139,7 +139,7 @@ export class ESCPosCommandGenerator {
   cutPaper(): ESCPosCommand {
     return {
       command: [this.GS, 0x56, 0x42, 0x00], // GS V B n
-      description: 'Cut paper'
+      description: 'Cut paper',
     };
   }
 
@@ -148,27 +148,27 @@ export class ESCPosCommandGenerator {
    */
   generateBarcode(type: 'code128' | 'ean13' | 'code39', data: string): ESCPosCommand {
     let command: number[];
-    
+
     switch (type) {
       case 'code128':
-        command = [this.GS, 0x6B, 0x49]; // GS k m n
+        command = [this.GS, 0x6b, 0x49]; // GS k m n
         break;
       case 'ean13':
-        command = [this.GS, 0x6B, 0x02]; // GS k m n
+        command = [this.GS, 0x6b, 0x02]; // GS k m n
         break;
       case 'code39':
-        command = [this.GS, 0x6B, 0x04]; // GS k m n
+        command = [this.GS, 0x6b, 0x04]; // GS k m n
         break;
       default:
         throw new Error(`Unsupported barcode type: ${type}`);
     }
-    
+
     // Add data length and data
     command.push(data.length, ...data.split('').map(char => char.charCodeAt(0)));
-    
+
     return {
       command,
-      description: `Generate ${type} barcode: ${data}`
+      description: `Generate ${type} barcode: ${data}`,
     };
   }
 
@@ -180,7 +180,7 @@ export class ESCPosCommandGenerator {
 
     // Initialize
     commands.push(...this.initializePrinter().command);
-    
+
     // Store header
     commands.push(...this.setAlignment('center').command);
     commands.push(...this.setCharacterSize(2, 2).command);
@@ -188,7 +188,7 @@ export class ESCPosCommandGenerator {
     commands.push(...this.encodeText(`${receiptData.header.storeName}\n`));
     commands.push(...this.setCharacterSize(1, 1).command);
     commands.push(...this.setEmphasis(false).command);
-    
+
     commands.push(...this.encodeText(`${receiptData.header.storeAddress}\n`));
     if (receiptData.header.storePhone) {
       commands.push(...this.encodeText(`Tel: ${receiptData.header.storePhone}\n`));
@@ -196,48 +196,50 @@ export class ESCPosCommandGenerator {
     if (receiptData.header.storeTaxId) {
       commands.push(...this.encodeText(`NPWP: ${receiptData.header.storeTaxId}\n`));
     }
-    
+
     commands.push(...this.feedLines(1).command);
-    
+
     // Transaction info
     commands.push(...this.setAlignment('left').command);
     commands.push(...this.encodeText(`No Struk: ${receiptData.transaction.receiptNumber}\n`));
     commands.push(...this.encodeText(`Kasir: ${receiptData.transaction.cashierName}\n`));
-    commands.push(...this.encodeText(`Tanggal: ${this.formatDate(receiptData.transaction.timestamp)}\n`));
+    commands.push(
+      ...this.encodeText(`Tanggal: ${this.formatDate(receiptData.transaction.timestamp)}\n`)
+    );
     commands.push(...this.encodeText(`Cabang: ${receiptData.transaction.branchId}\n`));
-    
+
     // Customer info
     if (receiptData.customer) {
-      commands.push(...this.encodeText(`Customer: ${receiptData.customer.name || 'Guest'}\n`));
+      commands.push(...this.encodeText(`Customer: ${receiptData.customer.name ?? 'Guest'}\n`));
       if (receiptData.customer.memberId) {
         commands.push(...this.encodeText(`Member ID: ${receiptData.customer.memberId}\n`));
       }
     }
-    
-    commands.push(...this.encodeText('='.repeat(32) + '\n'));
-    
+
+    commands.push(...this.encodeText(`${'='.repeat(32)}\n`));
+
     // Items header
     commands.push(...this.encodeText('ITEM                 QTY    HARGA\n'));
-    commands.push(...this.encodeText('-'.repeat(32) + '\n'));
-    
+    commands.push(...this.encodeText(`${'-'.repeat(32)}\n`));
+
     // Items
     receiptData.items.forEach(item => {
       const itemLine = this.formatItemLine(item);
-      commands.push(...this.encodeText(itemLine + '\n'));
-      
+      commands.push(...this.encodeText(`${itemLine}\n`));
+
       // Item discount line
       if (item.discount && item.discount > 0) {
         commands.push(...this.encodeText(`  Diskon: -${this.formatCurrency(item.discount)}\n`));
       }
-      
+
       // Barcode line
       if (item.barcode) {
         commands.push(...this.encodeText(`  ${item.barcode}\n`));
       }
     });
-    
-    commands.push(...this.encodeText('-'.repeat(32) + '\n'));
-    
+
+    commands.push(...this.encodeText(`${'-'.repeat(32)}\n`));
+
     // Discounts
     if (receiptData.discounts.length > 0) {
       commands.push(...this.encodeText('DISKON:\n'));
@@ -246,25 +248,43 @@ export class ESCPosCommandGenerator {
         commands.push(...this.encodeText(`  ${discountText}\n`));
       });
     }
-    
+
     // Totals
-    commands.push(...this.encodeText('-'.repeat(32) + '\n'));
-    commands.push(...this.encodeText(`Subtotal:            ${this.formatCurrency(receiptData.totals.subtotal)}\n`));
-    
+    commands.push(...this.encodeText(`${'-'.repeat(32)}\n`));
+    commands.push(
+      ...this.encodeText(
+        `Subtotal:            ${this.formatCurrency(receiptData.totals.subtotal)}\n`
+      )
+    );
+
     if (receiptData.totals.discountTotal > 0) {
-      commands.push(...this.encodeText(`Total Diskon:        -${this.formatCurrency(receiptData.totals.discountTotal)}\n`));
+      commands.push(
+        ...this.encodeText(
+          `Total Diskon:        -${this.formatCurrency(receiptData.totals.discountTotal)}\n`
+        )
+      );
     }
-    
-    commands.push(...this.encodeText(`Pajak:               ${this.formatCurrency(receiptData.totals.taxTotal)}\n`));
+
+    commands.push(
+      ...this.encodeText(
+        `Pajak:               ${this.formatCurrency(receiptData.totals.taxTotal)}\n`
+      )
+    );
     commands.push(...this.setEmphasis(true).command);
-    commands.push(...this.encodeText(`TOTAL:               ${this.formatCurrency(receiptData.totals.grandTotal)}\n`));
+    commands.push(
+      ...this.encodeText(
+        `TOTAL:               ${this.formatCurrency(receiptData.totals.grandTotal)}\n`
+      )
+    );
     commands.push(...this.setEmphasis(false).command);
-    
+
     // Payment methods
-    commands.push(...this.encodeText('-'.repeat(32) + '\n'));
+    commands.push(...this.encodeText(`${'-'.repeat(32)}\n`));
     commands.push(...this.encodeText('PEMBAYARAN:\n'));
     receiptData.payments.forEach(payment => {
-      const paymentText = `${this.formatPaymentMethod(payment.method)}: ${this.formatCurrency(payment.amount)}`;
+      const paymentText = `${this.formatPaymentMethod(payment.method)}: ${this.formatCurrency(
+        payment.amount
+      )}`;
       if (payment.reference) {
         commands.push(...this.encodeText(`  ${paymentText}\n`));
         commands.push(...this.encodeText(`  Ref: ${payment.reference}\n`));
@@ -272,13 +292,15 @@ export class ESCPosCommandGenerator {
         commands.push(...this.encodeText(`  ${paymentText}\n`));
       }
     });
-    
+
     if (receiptData.totals.changeGiven > 0) {
-      commands.push(...this.encodeText(`  Kembalian: ${this.formatCurrency(receiptData.totals.changeGiven)}\n`));
+      commands.push(
+        ...this.encodeText(`  Kembalian: ${this.formatCurrency(receiptData.totals.changeGiven)}\n`)
+      );
     }
-    
+
     commands.push(...this.feedLines(2).command);
-    
+
     // Footer
     commands.push(...this.setAlignment('center').command);
     if (receiptData.footer.thankYouMessage) {
@@ -286,23 +308,23 @@ export class ESCPosCommandGenerator {
       commands.push(...this.encodeText(`${receiptData.footer.thankYouMessage}\n`));
       commands.push(...this.setEmphasis(false).command);
     }
-    
+
     if (receiptData.footer.returnPolicy) {
       commands.push(...this.encodeText(`${receiptData.footer.returnPolicy}\n`));
     }
-    
+
     if (receiptData.footer.website) {
       commands.push(...this.encodeText(`${receiptData.footer.website}\n`));
     }
-    
+
     // Cashier signature
     commands.push(...this.feedLines(2).command);
     commands.push(...this.encodeText(`Kasir: ________________________\n`));
-    
+
     // Cut paper
     commands.push(...this.feedLines(3).command);
     commands.push(...this.cutPaper().command);
-    
+
     return commands;
   }
 
@@ -321,7 +343,7 @@ export class ESCPosCommandGenerator {
       style: 'currency',
       currency: 'IDR',
       minimumFractionDigits: 0,
-      maximumFractionDigits: 0
+      maximumFractionDigits: 0,
     }).format(amount);
   }
 
@@ -334,7 +356,7 @@ export class ESCPosCommandGenerator {
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     }).format(date);
   }
 
@@ -345,7 +367,7 @@ export class ESCPosCommandGenerator {
     const name = item.name.length > 16 ? item.name.substring(0, 16) : item.name;
     const quantity = item.quantity.toString().padStart(3);
     const price = this.formatCurrency(item.totalPrice);
-    
+
     // Align to 32 character width
     const line = `${name.padEnd(20)}${quantity}   ${price}`;
     return line.length > 32 ? line.substring(0, 32) : line;
@@ -356,14 +378,14 @@ export class ESCPosCommandGenerator {
    */
   private formatPaymentMethod(method: string): string {
     const methodMap: Record<string, string> = {
-      'cash': 'TUNAI',
-      'card': 'KARTU',
-      'qris': 'QRIS',
-      'ewallet': 'E-WALLET',
-      'bank_transfer': 'TRANSFER',
-      'credit': 'KREDIT'
+      cash: 'TUNAI',
+      card: 'KARTU',
+      qris: 'QRIS',
+      ewallet: 'E-WALLET',
+      bank_transfer: 'TRANSFER',
+      credit: 'KREDIT',
     };
-    
+
     return methodMap[method] || method.toUpperCase();
   }
 }

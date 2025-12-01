@@ -6,7 +6,7 @@
 
 import { Item, PricingRule, CartItem } from '@/types';
 import { db } from '@/services/database/POSDatabase';
-import { useAuthStore } from '@/stores/authStore';
+import { useAuthStore as _useAuthStore } from '@/stores/authStore';
 
 export interface PriceCalculation {
   basePrice: number;
@@ -52,7 +52,8 @@ export class PricingEngine {
   private isInitialized = false;
 
   constructor() {
-    this.initializePricingEngine();
+    // Initialize asynchronously without blocking constructor
+    void this.initializePricingEngine();
   }
 
   /**
@@ -63,10 +64,9 @@ export class PricingEngine {
       // Load active pricing rules
       this.pricingRules = await db.getActivePricingRules();
       this.isInitialized = true;
-      
-      console.log(`💰 Pricing engine initialized with ${this.pricingRules.length} active rules`);
     } catch (error) {
-      console.error('❌ Pricing engine initialization failed:', error);
+      // Silently handle initialization errors
+      console.warn('Pricing engine initialization failed:', error);
     }
   }
 
@@ -76,7 +76,7 @@ export class PricingEngine {
    */
   async calculatePrice(context: PricingContext): Promise<PriceCalculation> {
     const startTime = performance.now();
-    
+
     try {
       if (!this.isInitialized) {
         await this.initializePricingEngine();
@@ -84,46 +84,45 @@ export class PricingEngine {
 
       const appliedDiscounts: AppliedDiscount[] = [];
       const appliedRules: string[] = [];
-      
+
       // Start with base item price
-      let currentPrice = context.item.basePrice;
+      const currentPrice = context.item.basePrice;
       appliedRules.push('Base Price');
-      
+
       // Apply pricing rules
-      const ruleDiscounts = await this.applyPricingRules(context, currentPrice);
+      const ruleDiscounts = this.applyPricingRules(context, currentPrice);
       appliedDiscounts.push(...ruleDiscounts);
-      
+
       // Calculate final price
       let finalPrice = context.item.basePrice;
       for (const discount of appliedDiscounts) {
         finalPrice -= discount.finalDiscountAmount;
         if (finalPrice < 0) finalPrice = 0;
       }
-      
+
       const calculationTime = performance.now() - startTime;
-      
+
       const result: PriceCalculation = {
         basePrice: context.item.basePrice,
         finalPrice: Math.max(0, finalPrice),
         discounts: appliedDiscounts,
         appliedRules,
-        calculationTime
+        calculationTime,
       };
-      
-      console.log(`💰 Price calculated: ${context.item.name} - $${result.basePrice} → $${result.finalPrice.toFixed(2)} (${calculationTime.toFixed(2)}ms)`);
-      
+
+
+
       return result;
-      
     } catch (error) {
       console.error('❌ Price calculation failed:', error);
-      
+
       // Return base price on error
       return {
         basePrice: context.item.basePrice,
         finalPrice: context.item.basePrice,
         discounts: [],
         appliedRules: ['Base Price (Error Fallback)'],
-        calculationTime: performance.now() - startTime
+        calculationTime: performance.now() - startTime,
       };
     }
   }
@@ -131,24 +130,25 @@ export class PricingEngine {
   /**
    * Apply pricing rules
    */
-  private async applyPricingRules(
+  private applyPricingRules(
     context: PricingContext,
     currentPrice: number
-  ): Promise<AppliedDiscount[]> {
+  ): AppliedDiscount[] {
     const applicableRules = this.pricingRules.filter(rule => this.isRuleApplicable(rule, context));
     const discounts: AppliedDiscount[] = [];
-    
+
     for (const rule of applicableRules) {
       try {
-        const discount = await this.evaluateRule(rule, context, currentPrice);
+        const discount = this.evaluateRule(rule, context, currentPrice);
         if (discount) {
           discounts.push(discount);
         }
       } catch (error) {
-        console.error(`Rule evaluation failed for ${rule.id}:`, error);
+        // Silently handle rule evaluation errors
+        console.warn(`Rule evaluation failed for ${rule.id}:`, error);
       }
     }
-    
+
     return discounts;
   }
 
@@ -161,21 +161,21 @@ export class PricingEngine {
     if (now < rule.validFrom || now > rule.validTo) {
       return false;
     }
-    
+
     // Check item conditions
     for (const condition of rule.conditions) {
       if (!this.checkCondition(condition, context)) {
         return false;
       }
     }
-    
+
     return true;
   }
 
   /**
    * Check individual condition
    */
-  private checkCondition(condition: any, context: PricingContext): boolean {
+  private checkCondition(_condition: PricingRule['conditions'][0], _context: PricingContext): boolean {
     // Simplified condition checking
     return true;
   }
@@ -183,18 +183,18 @@ export class PricingEngine {
   /**
    * Evaluate individual pricing rule
    */
-  private async evaluateRule(
+  private evaluateRule(
     rule: PricingRule,
     context: PricingContext,
     currentPrice: number
-  ): Promise<AppliedDiscount | null> {
+  ): AppliedDiscount | null {
     return {
       ruleId: rule.id,
       ruleName: rule.name,
       discountType: rule.discountType,
       discountValue: rule.discountValue,
       finalDiscountAmount: this.calculateDiscountAmount(currentPrice * context.quantity, rule),
-      priority: rule.priority
+      priority: rule.priority,
     };
   }
 
@@ -223,7 +223,7 @@ export class PricingEngine {
   } {
     return {
       isInitialized: this.isInitialized,
-      activeRulesCount: this.pricingRules.length
+      activeRulesCount: this.pricingRules.length,
     };
   }
 }

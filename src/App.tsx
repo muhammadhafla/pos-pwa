@@ -25,10 +25,7 @@ function App() {
     <div className="App h-screen bg-gray-50">
       <NetworkStatus />
       <Routes>
-        <Route
-          path="/login"
-          element={!isAuthenticated ? <LoginPage /> : <Navigate to="/" />}
-        />
+        <Route path="/login" element={!isAuthenticated ? <LoginPage /> : <Navigate to="/" />} />
         <Route
           path="/*"
           element={isAuthenticated ? <IntegratedPOSInterface /> : <Navigate to="/login" />}

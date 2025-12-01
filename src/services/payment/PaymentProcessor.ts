@@ -107,7 +107,7 @@ export class PaymentProcessor {
     successRate: 0,
     averageProcessingTime: 0,
     commonErrors: {},
-    approvalRate: 0
+    approvalRate: 0,
   };
 
   // Event listeners
@@ -131,10 +131,10 @@ export class PaymentProcessor {
    */
   private initializePaymentProcessor(): void {
     console.log('💳 Initializing Payment Processor...');
-    
+
     // Set up cleanup for expired approvals
     this.startApprovalCleanup();
-    
+
     console.log('✅ Payment Processor initialized');
   }
 
@@ -144,13 +144,13 @@ export class PaymentProcessor {
   async processPayment(request: PaymentRequest): Promise<PaymentResult> {
     const startTime = performance.now();
     const transactionId = crypto.randomUUID();
-    
+
     console.log(`💳 Starting payment processing: ${transactionId}`);
-    
+
     try {
       // Step 1: Validate payment request
       const validationResult = await this.validatePaymentRequest(request);
-      
+
       if (!validationResult.isValid) {
         return this.createErrorResult(
           transactionId,
@@ -160,56 +160,59 @@ export class PaymentProcessor {
       }
 
       // Step 2: Check if approval is required
-      const approvalRequirement = await this.checkApprovalRequirement(request);
-      
+      const approvalRequirement = this.checkApprovalRequirement(request);
+
       if (approvalRequirement.required) {
         const approvalRequest = await this.requestApproval(approvalRequirement);
-        
+
         if (approvalRequest) {
           return {
             success: false,
             transactionId,
             approvalRequired: true,
             approvalId: approvalRequest.id,
-            errors: [{
-              code: 'APPROVAL_REQUIRED',
-              message: approvalRequirement.reason || 'Approval required',
-              recoverable: false,
-              retryable: false
-            }],
+            errors: [
+              {
+                code: 'APPROVAL_REQUIRED',
+                message: approvalRequirement.reason ?? 'Approval required',
+                recoverable: false,
+                retryable: false,
+              },
+            ],
             warnings: [],
-            processingTime: performance.now() - startTime
+            processingTime: performance.now() - startTime,
           };
         }
       }
 
       // Step 3: Process split payment if applicable
       const splitPaymentResult = await this.processSplitPayment(request);
-      
+
       if (splitPaymentResult && !splitPaymentResult.success) {
         return splitPaymentResult;
       }
 
       // Step 4: Execute payment processing
       const paymentResult = await this.executePayment(splitPaymentResult);
-      
+
       // Step 5: Handle payment result
       return this.handlePaymentResult(paymentResult, performance.now() - startTime);
-      
     } catch (error) {
       console.error('❌ Payment processing failed:', error);
-      
+
       return {
         success: false,
         transactionId,
-        errors: [{
-          code: 'PROCESSING_ERROR',
-          message: error instanceof Error ? error.message : 'Unknown error',
-          recoverable: false,
-          retryable: true
-        }],
+        errors: [
+          {
+            code: 'PROCESSING_ERROR',
+            message: error instanceof Error ? error.message : 'Unknown error',
+            recoverable: false,
+            retryable: true,
+          },
+        ],
         warnings: [],
-        processingTime: performance.now() - startTime
+        processingTime: performance.now() - startTime,
       };
     }
   }
@@ -232,7 +235,7 @@ export class PaymentProcessor {
         message: 'Total amount must be greater than zero',
         field: 'totalAmount',
         recoverable: false,
-        retryable: false
+        retryable: false,
       });
     }
 
@@ -242,17 +245,20 @@ export class PaymentProcessor {
         message: 'Payment cannot be processed without items',
         field: 'items',
         recoverable: false,
-        retryable: false
+        retryable: false,
       });
     }
 
     // Payment method validation
-    const paymentValidation = this.validatePaymentMethods(request.paymentMethod, request.totalAmount);
+    const paymentValidation = this.validatePaymentMethods(
+      request.paymentMethod,
+      request.totalAmount
+    );
     errors.push(...paymentValidation.errors);
     warnings.push(...paymentValidation.warnings);
 
     // Custom validation rules
-    for (const validation of request.options.customValidation || []) {
+    for (const validation of request.options.customValidation ?? []) {
       const customValidation = await this.applyCustomValidation(validation, request);
       errors.push(...customValidation.errors);
       warnings.push(...customValidation.warnings);
@@ -268,37 +274,43 @@ export class PaymentProcessor {
     return {
       isValid: errors.length === 0,
       errors,
-      warnings
+      warnings,
     };
   }
 
   /**
    * Validate individual payment methods
    */
-  private validatePaymentMethods(payment: PaymentBreakdown, totalAmount: number): {
+  private validatePaymentMethods(
+    payment: PaymentBreakdown,
+    totalAmount: number
+  ): {
     errors: PaymentError[];
     warnings: PaymentWarning[];
   } {
     const errors: PaymentError[] = [];
     const warnings: PaymentWarning[] = [];
 
-    const totalPayment = payment.cash + payment.card + payment.ewallet + payment.bankTransfer + payment.credit;
+    const totalPayment =
+      payment.cash + payment.card + payment.ewallet + payment.bankTransfer + payment.credit;
 
     if (totalPayment <= 0) {
       errors.push({
         code: 'NO_PAYMENT',
         message: 'At least one payment method must be selected',
         recoverable: false,
-        retryable: false
+        retryable: false,
       });
     }
 
     if (totalPayment < totalAmount) {
       errors.push({
         code: 'INSUFFICIENT_PAYMENT',
-        message: `Payment amount (${totalPayment.toFixed(2)}) is less than total amount (${totalAmount.toFixed(2)})`,
+        message: `Payment amount (${totalPayment.toFixed(
+          2
+        )}) is less than total amount (${totalAmount.toFixed(2)})`,
         recoverable: true,
-        retryable: true
+        retryable: true,
       });
     }
 
@@ -310,7 +322,7 @@ export class PaymentProcessor {
           message: `Payment amount for ${method} cannot be negative`,
           field: method,
           recoverable: false,
-          retryable: false
+          retryable: false,
         });
       }
     }
@@ -320,7 +332,7 @@ export class PaymentProcessor {
       warnings.push({
         code: 'LARGE_CASH_PAYMENT',
         message: 'Large cash payment detected',
-        suggestion: 'Consider processing additional payment methods for large amounts'
+        suggestion: 'Consider processing additional payment methods for large amounts',
       });
     }
 
@@ -330,17 +342,17 @@ export class PaymentProcessor {
   /**
    * Check if approval is required for this payment
    */
-  private async checkApprovalRequirement(request: PaymentRequest): Promise<{
+  private checkApprovalRequirement(request: PaymentRequest): {
     required: boolean;
     reason?: string;
     type?: ApprovalRequest['requestType'];
-  }> {
+  } {
     // Check for large amount (over 10 million IDR)
     if (request.totalAmount > 10000000) {
       return {
         required: true,
         reason: 'Large amount transaction requires supervisor approval',
-        type: 'large_amount'
+        type: 'large_amount',
       };
     }
 
@@ -350,17 +362,17 @@ export class PaymentProcessor {
       return {
         required: true,
         reason: `Split payment with ${activeMethods.length} methods requires approval`,
-        type: 'split_payment'
+        type: 'split_payment',
       };
     }
 
     // Check if custom validation requires approval
-    for (const validation of request.options.customValidation || []) {
+    for (const validation of request.options.customValidation ?? []) {
       if (validation.rule === 'supervisor_override') {
         return {
           required: true,
           reason: 'Supervisor override requires approval',
-          type: 'supervisor_override'
+          type: 'supervisor_override',
         };
       }
     }
@@ -377,27 +389,27 @@ export class PaymentProcessor {
     }
 
     const activeMethods = this.getActivePaymentMethods(request.paymentMethod);
-    
+
     if (activeMethods.length <= 1) {
       return null; // Not a split payment
     }
 
     try {
       // Calculate optimal split
-      const splitCalculation = await this.calculateOptimalSplit(request);
-      
+      const splitCalculation = this.calculateOptimalSplit(request);
+
       // Recommend improvements
       const recommendations = this.generatePaymentRecommendations(request);
-      
+
       // Apply recommendations if beneficial
       if (recommendations.length > 0) {
         const improvedPayment = await this.applyPaymentRecommendations(
-          request.paymentMethod, 
+          request.paymentMethod,
           recommendations
         );
-        
+
         console.log('💡 Applied payment recommendations for better efficiency');
-        
+
         return {
           success: true,
           transactionId: '',
@@ -405,28 +417,29 @@ export class PaymentProcessor {
           warnings: recommendations.map(rec => ({
             code: 'PAYMENT_RECOMMENDATION',
             message: `Recommended: ${rec.method} - ${rec.reason}`,
-            suggestion: rec.benefits.join(', ')
+            suggestion: rec.benefits.join(', '),
           })),
-          processingTime: 0
+          processingTime: 0,
         };
       }
-      
+
       return null;
-      
     } catch (error) {
       console.error('❌ Split payment processing failed:', error);
-      
+
       return {
         success: false,
         transactionId: '',
-        errors: [{
-          code: 'SPLIT_PAYMENT_ERROR',
-          message: 'Failed to process split payment',
-          recoverable: true,
-          retryable: true
-        }],
+        errors: [
+          {
+            code: 'SPLIT_PAYMENT_ERROR',
+            message: 'Failed to process split payment',
+            recoverable: true,
+            retryable: true,
+          },
+        ],
         warnings: [],
-        processingTime: 0
+        processingTime: 0,
       };
     }
   }
@@ -434,41 +447,42 @@ export class PaymentProcessor {
   /**
    * Calculate optimal payment split
    */
-  private async calculateOptimalSplit(request: PaymentRequest): Promise<SplitPaymentCalculation> {
+  private calculateOptimalSplit(request: PaymentRequest): SplitPaymentCalculation {
     const payment = request.paymentMethod;
     const totalAmount = request.totalAmount;
-    
+
     // Calculate remaining amount after initial allocation
-    const currentTotal = payment.cash + payment.card + payment.ewallet + payment.bankTransfer + payment.credit;
+    const currentTotal =
+      payment.cash + payment.card + payment.ewallet + payment.bankTransfer + payment.credit;
     const remainingAmount = Math.max(0, totalAmount - currentTotal);
-    
+
     // Generate recommendations for better allocation
     const recommendations: PaymentRecommendation[] = [];
-    
+
     // Recommend reducing cash if it's too large
     if (payment.cash > totalAmount * 0.7) {
       recommendations.push({
         method: 'ewallet',
         amount: Math.min(payment.cash * 0.3, remainingAmount),
         reason: 'Reduce cash handling by using e-wallet',
-        benefits: ['Faster checkout', 'Reduced cash handling', 'Better tracking']
+        benefits: ['Faster checkout', 'Reduced cash handling', 'Better tracking'],
       });
     }
-    
+
     // Recommend card for larger amounts
     if (totalAmount > 500000 && payment.card < totalAmount * 0.5) {
       recommendations.push({
         method: 'card',
         amount: Math.min(totalAmount * 0.3, remainingAmount),
         reason: 'Use card for larger transaction amounts',
-        benefits: ['Lower transaction costs', 'Better security', 'Detailed tracking']
+        benefits: ['Lower transaction costs', 'Better security', 'Detailed tracking'],
       });
     }
-    
+
     return {
       allocation: payment,
       remainingAmount,
-      recommendations
+      recommendations,
     };
   }
 
@@ -479,27 +493,27 @@ export class PaymentProcessor {
     const recommendations: PaymentRecommendation[] = [];
     const payment = request.paymentMethod;
     const totalAmount = request.totalAmount;
-    
+
     // E-wallet recommendations
     if (payment.ewallet === 0 && totalAmount < 200000) {
       recommendations.push({
         method: 'ewallet',
         amount: totalAmount * 0.3,
         reason: 'E-wallet provides faster checkout for small amounts',
-        benefits: ['Contactless', 'Instant confirmation', 'Loyalty points']
+        benefits: ['Contactless', 'Instant confirmation', 'Loyalty points'],
       });
     }
-    
+
     // Card recommendations for specific amounts
     if ([50000, 100000, 500000].includes(Math.round(totalAmount)) && payment.card === 0) {
       recommendations.push({
         method: 'card',
         amount: totalAmount,
         reason: 'Round amounts processed efficiently with card',
-        benefits: ['Fast processing', 'Low fees', 'Secure transaction']
+        benefits: ['Fast processing', 'Low fees', 'Secure transaction'],
       });
     }
-    
+
     return recommendations;
   }
 
@@ -507,18 +521,22 @@ export class PaymentProcessor {
    * Apply payment recommendations
    */
   private async applyPaymentRecommendations(
-    payment: PaymentBreakdown, 
+    payment: PaymentBreakdown,
     recommendations: PaymentRecommendation[]
   ): Promise<PaymentBreakdown> {
     const optimized = { ...payment };
-    
+
     for (const recommendation of recommendations) {
       if (optimized[recommendation.method] === 0) {
         optimized[recommendation.method] = recommendation.amount;
-        console.log(`💡 Applied recommendation: ${recommendation.method} - ${recommendation.amount.toFixed(2)}`);
+        console.log(
+          `💡 Applied recommendation: ${recommendation.method} - ${recommendation.amount.toFixed(
+            2
+          )}`
+        );
       }
     }
-    
+
     return optimized;
   }
 
@@ -532,10 +550,10 @@ export class PaymentProcessor {
 
     // For now, simulate payment processing
     // In a real implementation, this would integrate with actual payment gateways
-    
+
     const paymentId = crypto.randomUUID();
     const change = Math.max(0, 1000000 - 500000); // Mock calculation
-    
+
     return {
       success: true,
       transactionId: paymentId,
@@ -543,7 +561,7 @@ export class PaymentProcessor {
       change,
       errors: [],
       warnings: [],
-      processingTime: 1500 // Mock processing time
+      processingTime: 1500, // Mock processing time
     };
   }
 
@@ -553,31 +571,29 @@ export class PaymentProcessor {
   private handlePaymentResult(result: PaymentResult, processingTime: number): PaymentResult {
     // Update statistics
     this.processingStats.totalProcessed++;
-    
+
     if (result.success) {
-      this.processingStats.successRate = (
-        (this.processingStats.successRate * (this.processingStats.totalProcessed - 1) + 100) / 
-        this.processingStats.totalProcessed
-      );
+      this.processingStats.successRate =
+        (this.processingStats.successRate * (this.processingStats.totalProcessed - 1) + 100) /
+        this.processingStats.totalProcessed;
     } else {
-      this.processingStats.successRate = (
-        (this.processingStats.successRate * (this.processingStats.totalProcessed - 1)) / 
-        this.processingStats.totalProcessed
-      );
-      
+      this.processingStats.successRate =
+        (this.processingStats.successRate * (this.processingStats.totalProcessed - 1)) /
+        this.processingStats.totalProcessed;
+
       // Count common errors
       for (const error of result.errors) {
-        this.processingStats.commonErrors[error.code] = 
+        this.processingStats.commonErrors[error.code] =
           (this.processingStats.commonErrors[error.code] || 0) + 1;
       }
     }
-    
+
     // Update average processing time
-    this.processingStats.averageProcessingTime = (
-      (this.processingStats.averageProcessingTime * (this.processingStats.totalProcessed - 1) + processingTime) / 
-      this.processingStats.totalProcessed
-    );
-    
+    this.processingStats.averageProcessingTime =
+      (this.processingStats.averageProcessingTime * (this.processingStats.totalProcessed - 1) +
+        processingTime) /
+      this.processingStats.totalProcessed;
+
     // Notify success callbacks
     if (result.success) {
       this.onPaymentSuccessCallbacks.forEach(callback => callback(result));
@@ -588,7 +604,7 @@ export class PaymentProcessor {
         }
       });
     }
-    
+
     return result;
   }
 
@@ -609,20 +625,20 @@ export class PaymentProcessor {
       transactionId: crypto.randomUUID(),
       requestType: requirement.type,
       amount: 0, // This would be set from the payment request
-      reason: requirement.reason || 'Approval required',
+      reason: requirement.reason ?? 'Approval required',
       requestedBy: 'current_user', // This would be from auth context
       timestamp: new Date(),
-      status: 'pending'
+      status: 'pending',
     };
 
     // Store approval request
     this.pendingApprovals.set(approvalRequest.id, approvalRequest);
-    
+
     // Notify approval listeners
     this.onApprovalRequiredCallbacks.forEach(callback => callback(approvalRequest));
-    
+
     console.log(`🔒 Approval requested: ${approvalRequest.id} - ${requirement.reason}`);
-    
+
     return approvalRequest;
   }
 
@@ -631,15 +647,15 @@ export class PaymentProcessor {
    */
   async approvePayment(approvalId: string, approvedBy: string): Promise<boolean> {
     const approval = this.pendingApprovals.get(approvalId);
-    
+
     if (!approval) {
       return false;
     }
-    
+
     approval.status = 'approved';
-    
+
     console.log(`✅ Payment approved: ${approvalId} by ${approvedBy}`);
-    
+
     return true;
   }
 
@@ -656,7 +672,7 @@ export class PaymentProcessor {
    * Apply custom validation rule
    */
   private async applyCustomValidation(
-    validation: PaymentValidation, 
+    validation: PaymentValidation,
     request: PaymentRequest
   ): Promise<{ errors: PaymentError[]; warnings: PaymentWarning[] }> {
     const errors: PaymentError[] = [];
@@ -670,11 +686,11 @@ export class PaymentProcessor {
             warnings.push({
               code: 'SUPERVISOR_OVERRIDE',
               message: validation.message,
-              suggestion: 'Supervisor approval required for price modifications'
+              suggestion: 'Supervisor approval required for price modifications',
             });
           }
           break;
-          
+
         case 'member_only_payment':
           // Only allow specific payment methods for members
           if (request.customerInfo?.memberId) {
@@ -682,12 +698,12 @@ export class PaymentProcessor {
               warnings.push({
                 code: 'CREDIT_NOT_ALLOWED',
                 message: 'Credit payment not allowed for member transactions',
-                suggestion: 'Use cash or card payment method'
+                suggestion: 'Use cash or card payment method',
               });
             }
           }
           break;
-          
+
         case 'max_cash_amount':
           // Limit cash payment amount
           const maxCash = validation.parameters.maxCash || 2000000;
@@ -697,23 +713,22 @@ export class PaymentProcessor {
               message: `Cash payment exceeds maximum allowed amount of ${maxCash.toLocaleString()}`,
               field: 'cash',
               recoverable: true,
-              retryable: true
+              retryable: true,
             });
           }
           break;
-          
+
         default:
           console.warn(`Unknown validation rule: ${validation.rule}`);
       }
-      
     } catch (error) {
       console.error(`Validation rule ${validation.rule} failed:`, error);
-      
+
       errors.push({
         code: 'VALIDATION_ERROR',
         message: `Validation rule ${validation.rule} failed: ${error}`,
         recoverable: false,
-        retryable: false
+        retryable: false,
       });
     }
 
@@ -724,8 +739,8 @@ export class PaymentProcessor {
    * Create error result
    */
   private createErrorResult(
-    transactionId: string, 
-    errors: PaymentError[], 
+    transactionId: string,
+    errors: PaymentError[],
     processingTime: number
   ): PaymentResult {
     return {
@@ -733,7 +748,7 @@ export class PaymentProcessor {
       transactionId,
       errors,
       warnings: [],
-      processingTime
+      processingTime,
     };
   }
 
@@ -744,7 +759,7 @@ export class PaymentProcessor {
     setInterval(() => {
       const now = Date.now();
       const expiredIds: string[] = [];
-      
+
       for (const [id, approval] of this.pendingApprovals.entries()) {
         // Expire approvals older than 5 minutes
         if (now - approval.timestamp.getTime() > 5 * 60 * 1000) {
@@ -752,7 +767,7 @@ export class PaymentProcessor {
           expiredIds.push(id);
         }
       }
-      
+
       if (expiredIds.length > 0) {
         expiredIds.forEach(id => this.pendingApprovals.delete(id));
         console.log(`🧹 Cleaned up ${expiredIds.length} expired approvals`);
@@ -792,18 +807,21 @@ export class PaymentProcessor {
 
   // Validation helper methods
 
-  private validateSplitPayment(request: PaymentRequest): { errors: PaymentError[]; warnings: PaymentWarning[] } {
+  private validateSplitPayment(request: PaymentRequest): {
+    errors: PaymentError[];
+    warnings: PaymentWarning[];
+  } {
     const errors: PaymentError[] = [];
     const warnings: PaymentWarning[] = [];
 
     const activeMethods = this.getActivePaymentMethods(request.paymentMethod);
-    
+
     if (activeMethods.length > request.options.maxSplitMethods) {
       errors.push({
         code: 'TOO_MANY_SPLIT_METHODS',
         message: `Cannot use more than ${request.options.maxSplitMethods} payment methods`,
         recoverable: true,
-        retryable: true
+        retryable: true,
       });
     }
 
@@ -812,7 +830,8 @@ export class PaymentProcessor {
       warnings.push({
         code: 'INEFFICIENT_SPLIT',
         message: 'Cash and credit combination may slow down processing',
-        suggestion: 'Consider using one method or combining with faster methods like card or e-wallet'
+        suggestion:
+          'Consider using one method or combining with faster methods like card or e-wallet',
       });
     }
 

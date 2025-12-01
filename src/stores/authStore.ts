@@ -7,7 +7,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
-  
+
   // Actions
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
@@ -19,19 +19,19 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set, get) => ({
+    (set, _get) => ({
       user: null,
       isAuthenticated: false,
       isLoading: false,
       error: null,
 
-      login: async (username: string, password: string) => {
+      login: async (username: string, _password: string) => {
         set({ isLoading: true, error: null });
-        
+
         try {
           // Simulate authentication - in real implementation, this would call ERPNext API
           await new Promise(resolve => setTimeout(resolve, 1000));
-          
+
           // Mock user for development
           const mockUser: User = {
             id: 'user-001',
@@ -44,34 +44,33 @@ export const useAuthStore = create<AuthState>()(
             permissions: [
               { resource: 'transactions', actions: ['create', 'read'] },
               { resource: 'items', actions: ['read'] },
-              { resource: 'pricing', actions: ['read'] }
-            ]
+              { resource: 'pricing', actions: ['read'] },
+            ],
           };
-          
-          set({ 
-            user: mockUser, 
-            isAuthenticated: true, 
-            isLoading: false 
+
+          set({
+            user: mockUser,
+            isAuthenticated: true,
+            isLoading: false,
           });
-          
-          console.log('✅ User authenticated:', mockUser.fullName);
-          
+
+
         } catch (error) {
-          set({ 
-            error: 'Authentication failed', 
-            isLoading: false 
+          set({
+            error: 'Authentication failed',
+            isLoading: false,
           });
           console.error('❌ Authentication error:', error);
         }
       },
 
       logout: () => {
-        set({ 
-          user: null, 
-          isAuthenticated: false, 
-          error: null 
+        set({
+          user: null,
+          isAuthenticated: false,
+          error: null,
         });
-        console.log('👋 User logged out');
+
       },
 
       setUser: (user: User) => {
@@ -88,14 +87,14 @@ export const useAuthStore = create<AuthState>()(
 
       clearError: () => {
         set({ error: null });
-      }
+      },
     }),
     {
       name: 'pos-auth-storage',
-      partialize: (state) => ({ 
+      partialize: state => ({
         user: state.user,
-        isAuthenticated: state.isAuthenticated 
-      })
+        isAuthenticated: state.isAuthenticated,
+      }),
     }
   )
 );
@@ -103,18 +102,18 @@ export const useAuthStore = create<AuthState>()(
 // Hook for checking permissions
 export const usePermissions = () => {
   const { user } = useAuthStore();
-  
+
   return {
     hasPermission: (resource: string, action: string): boolean => {
-      if (!user || !user.permissions) return false;
-      
+      if (!user?.permissions) return false;
+
       const permission = user.permissions.find(p => p.resource === resource);
-      return permission?.actions.includes(action) || false;
+      return permission?.actions.includes(action) ?? false;
     },
-    
+
     isAdmin: user?.role === 'admin',
     isManager: user?.role === 'manager',
     isCashier: user?.role === 'cashier',
-    isSupervisor: user?.role === 'supervisor'
+    isSupervisor: user?.role === 'supervisor',
   };
 };

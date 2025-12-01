@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const NetworkStatus: React.FC = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -30,17 +30,17 @@ const NetworkStatus: React.FC = () => {
   }
 
   return (
-    <div className={`fixed top-0 left-0 right-0 z-50 text-center py-2 text-sm font-medium ${
-      isOnline 
-        ? 'bg-green-600 text-white' 
-        : 'bg-red-600 text-white'
-    }`}>
+    <div
+      className={`fixed top-0 left-0 right-0 z-50 text-center py-2 text-sm font-medium ${
+        isOnline ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+      }`}
+    >
       <div className="flex items-center justify-center space-x-2">
-        <div className={`w-2 h-2 rounded-full ${
-          isOnline ? 'bg-green-300' : 'bg-red-300'
-        }`}></div>
+        <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-300' : 'bg-red-300'}`}></div>
         <span>
-          {isOnline ? '🌐 Back online' : '📴 Offline mode - transactions will sync when connection restored'}
+          {isOnline
+            ? '🌐 Back online'
+            : '📴 Offline mode - transactions will sync when connection restored'}
         </span>
       </div>
     </div>

@@ -1,0 +1,44 @@
+{
+  "products": [
+    {
+      "id": "coffee-beans-001",
+      "name": "Coffee Beans",
+      "barcode": "123456789012",
+      "price": 10.99,
+      "category": "Coffee",
+      "taxable": true,
+      "inStock": 50,
+      "image": "/images/coffee-beans.jpg"
+    },
+    {
+      "id": "espresso-cup-001",
+      "name": "Espresso Cup",
+      "barcode": "123456789013",
+      "price": 5.99,
+      "category": "Accessories",
+      "taxable": true,
+      "inStock": 25,
+      "image": "/images/espresso-cup.jpg"
+    },
+    {
+      "id": "french-press-001",
+      "name": "French Press",
+      "barcode": "123456789014",
+      "price": 29.99,
+      "category": "Equipment",
+      "taxable": true,
+      "inStock": 10,
+      "image": "/images/french-press.jpg"
+    },
+    {
+      "id": "coffee-grinder-001",
+      "name": "Coffee Grinder",
+      "barcode": "123456789015",
+      "price": 79.99,
+      "category": "Equipment",
+      "taxable": true,
+      "inStock": 5,
+      "image": "/images/coffee-grinder.jpg"
+    }
+  ]
+}

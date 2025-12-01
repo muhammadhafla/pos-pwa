@@ -1,0 +1,34 @@
+{
+  "users": [
+    {
+      "id": "user-001",
+      "username": "testuser",
+      "password": "testpassword",
+      "firstName": "Test",
+      "lastName": "User",
+      "role": "cashier",
+      "permissions": ["process_sales", "view_reports"],
+      "active": true
+    },
+    {
+      "id": "user-002",
+      "username": "manager",
+      "password": "manager123",
+      "firstName": "Store",
+      "lastName": "Manager",
+      "role": "manager",
+      "permissions": ["process_sales", "view_reports", "manage_returns", "manage_users"],
+      "active": true
+    },
+    {
+      "id": "user-003",
+      "username": "admin",
+      "password": "admin123",
+      "firstName": "System",
+      "lastName": "Administrator",
+      "role": "admin",
+      "permissions": ["all"],
+      "active": true
+    }
+  ]
+}

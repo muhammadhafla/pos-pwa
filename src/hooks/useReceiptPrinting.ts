@@ -16,7 +16,11 @@ interface UseReceiptPrintingOptions {
 }
 
 interface UseReceiptPrintingReturn {
-  printReceipt: (transactionId: string, receiptData: ReceiptData, options?: UseReceiptPrintingOptions) => Promise<string | null>;
+  printReceipt: (
+    transactionId: string,
+    receiptData: ReceiptData,
+    options?: UseReceiptPrintingOptions
+  ) => Promise<string | null>;
   queueStatus: any;
   isLoading: boolean;
   lastJobId: string | null;
@@ -31,50 +35,52 @@ export const useReceiptPrinting = (
   const [lastJobId, setLastJobId] = useState<string | null>(null);
   const [printers, setPrinters] = useState<string[]>([]);
 
-  const printReceipt = useCallback(async (
-    transactionId: string,
-    receiptData: ReceiptData,
-    options: UseReceiptPrintingOptions = {}
-  ): Promise<string | null> => {
-    setIsLoading(true);
+  const printReceipt = useCallback(
+    async (
+      transactionId: string,
+      receiptData: ReceiptData,
+      options: UseReceiptPrintingOptions = {}
+    ): Promise<string | null> => {
+      setIsLoading(true);
 
-    try {
-      // Merge options with initial options
-      const printOptions = { ...initialOptions, ...options };
+      try {
+        // Merge options with initial options
+        const printOptions = { ...initialOptions, ...options };
 
-      // Add job to print queue
-      const jobId = await printQueueManager.addPrintJob(transactionId, receiptData, {
-        priority: printOptions.autoPrint ? 'high' : 'normal',
-        retryOnFailure: true,
-        previewBeforePrint: printOptions.showPreview
-      });
+        // Add job to print queue
+        const jobId = await printQueueManager.addPrintJob(transactionId, receiptData, {
+          priority: printOptions.autoPrint ? 'high' : 'normal',
+          retryOnFailure: true,
+          previewBeforePrint: printOptions.showPreview,
+        });
 
-      setLastJobId(jobId);
+        setLastJobId(jobId);
 
-      // Show success message
-      toast.success('Receipt sent to printer queue');
+        // Show success message
+        toast.success('Receipt sent to printer queue');
 
-      // Trigger callback
-      if (printOptions.onPrintComplete) {
-        printOptions.onPrintComplete(jobId);
+        // Trigger callback
+        if (printOptions.onPrintComplete) {
+          printOptions.onPrintComplete(jobId);
+        }
+
+        return jobId;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+        toast.error(`Print failed: ${errorMessage}`);
+
+        if (options.onPrintError) {
+          options.onPrintError(errorMessage);
+        }
+
+        return null;
+      } finally {
+        setIsLoading(false);
       }
-
-      return jobId;
-
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      
-      toast.error(`Print failed: ${errorMessage}`);
-      
-      if (options.onPrintError) {
-        options.onPrintError(errorMessage);
-      }
-      
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [initialOptions]);
+    },
+    [initialOptions]
+  );
 
   const queueStatus = printQueueManager.getQueueStatus();
 
@@ -94,7 +100,7 @@ export const useReceiptPrinting = (
     isLoading,
     lastJobId,
     printers,
-    refreshPrinters
+    refreshPrinters,
   };
 };
 
@@ -109,13 +115,13 @@ export const generateReceiptDataFromTransaction = (
       storeName: storeInfo.name,
       storeAddress: storeInfo.address,
       storePhone: storeInfo.phone,
-      storeTaxId: storeInfo.taxId
+      storeTaxId: storeInfo.taxId,
     },
     transaction: {
       receiptNumber: transaction.receiptNumber,
       cashierName: transaction.cashierName,
       timestamp: new Date(transaction.timestamp),
-      branchId: transaction.branchId
+      branchId: transaction.branchId,
     },
     customer: customerInfo,
     items: transaction.items.map((item: any) => ({
@@ -124,27 +130,27 @@ export const generateReceiptDataFromTransaction = (
       unitPrice: item.unitPrice,
       totalPrice: item.totalPrice,
       discount: item.discount,
-      barcode: item.barcode
+      barcode: item.barcode,
     })),
     discounts: transaction.discounts || [],
     payments: transaction.payments.map((payment: any) => ({
       method: payment.method,
       amount: payment.amount,
-      reference: payment.reference
+      reference: payment.reference,
     })),
     totals: {
       subtotal: transaction.subtotal,
       discountTotal: transaction.discountTotal,
       taxTotal: transaction.taxTotal,
       grandTotal: transaction.grandTotal,
-      changeGiven: transaction.changeGiven
+      changeGiven: transaction.changeGiven,
     },
     footer: {
       thankYouMessage: 'Terima kasih telah berbelanja!',
       returnPolicy: 'Barang dapat dikembalikan dalam 7 hari dengan struk asli',
       website: storeInfo.website,
-      socialMedia: storeInfo.socialMedia
-    }
+      socialMedia: storeInfo.socialMedia,
+    },
   };
 };
 
@@ -165,28 +171,29 @@ export const handleTransactionCompletion = async (
     if (shouldPrint) {
       // Generate receipt data
       const receiptData = generateReceiptDataFromTransaction(transaction, storeInfo);
-      
-      // Print receipt using the hook
-      const { printReceipt } = useReceiptPrinting({
-        autoPrint: true,
-        showPreview,
-        onPrintComplete: onComplete,
-        onPrintError: onError
+
+      // Print receipt using PrintQueueManager directly
+      const jobId = await printQueueManager.addPrintJob(transaction.id, receiptData, {
+        priority: 'high',
+        retryOnFailure: true,
+        previewBeforePrint: showPreview,
       });
 
-      const jobId = await printReceipt(transaction.id, receiptData);
+      if (onComplete) {
+        onComplete(jobId);
+      }
+
       return jobId;
     }
 
     return null;
-
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Transaction completion failed';
-    
+
     if (onError) {
       onError(errorMessage);
     }
-    
+
     throw error;
   }
 };
